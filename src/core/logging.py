@@ -4,7 +4,7 @@ import json
 import logging
 import sys
 from collections import OrderedDict
-from typing import Final
+from typing import Any, Final, cast
 
 import structlog
 
@@ -26,7 +26,7 @@ ORDER = [
 ]
 
 
-def _dumps(event_dict, **kwargs):
+def _dumps(event_dict: dict[str, Any], **kwargs: Any) -> str:
     out = {}
     for key in ORDER:
         if key in event_dict:
@@ -45,7 +45,7 @@ def setup_logging() -> structlog.BoundLogger:
     Returns:
         structlog.BoundLogger: Configured structlog logger.
     """
-    shared_processors = [
+    shared_processors: list[Any] = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
@@ -92,8 +92,17 @@ def setup_logging() -> structlog.BoundLogger:
     root_logger.addHandler(handler)
 
     # Use log level from settings, defaulting to INFO if invalid
-    print(settings.LOG_LEVEL)
     log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
     root_logger.setLevel(log_level)
 
-    return structlog.get_logger("github_connector")
+    # Silence noisy loggers in debug mode
+    for logger_name in [
+        "httpx",
+        "httpcore",
+        "authlib",
+        "uvicorn.access",
+        "anyio",
+    ]:
+        logging.getLogger(logger_name).setLevel(logging.INFO)
+
+    return cast(structlog.BoundLogger, structlog.get_logger("github_connector"))

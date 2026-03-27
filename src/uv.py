@@ -6,7 +6,7 @@ import uvicorn
 from src.core.config import settings
 
 
-def start_dev():
+def start_dev() -> None:
     os.environ["LOG_LEVEL"] = "debug"
 
     uvicorn.run(
@@ -17,7 +17,8 @@ def start_dev():
         log_level="debug",
     )
 
-def start_prod():
+
+def start_prod() -> None:
     os.environ["LOG_LEVEL"] = "info"
 
     uvicorn.run(
@@ -27,5 +28,12 @@ def start_prod():
         log_level="info",
     )
 
-def tests():
+
+def tests() -> None:
     raise SystemExit(pytest.main())
+
+
+def check() -> None:
+    os.system("ruff format src")
+    os.system("ruff check --fix src")
+    os.system("mypy src")
