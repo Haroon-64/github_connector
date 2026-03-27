@@ -8,6 +8,8 @@ from typing import Final
 
 import structlog
 
+from src.core.config import settings
+
 DEFAULT_LOGGING_LEVEL: Final[int] = logging.INFO
 DEFAULT_LOGGING_FORMAT: Final[str] = (
     "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -88,6 +90,10 @@ def setup_logging() -> structlog.BoundLogger:
             root_logger.removeHandler(h)
 
     root_logger.addHandler(handler)
-    root_logger.setLevel(DEFAULT_LOGGING_LEVEL)
+
+    # Use log level from settings, defaulting to INFO if invalid
+    print(settings.LOG_LEVEL)
+    log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+    root_logger.setLevel(log_level)
 
     return structlog.get_logger("github_connector")
