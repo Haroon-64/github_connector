@@ -39,6 +39,9 @@ warn_unused_configs = true
 
 [tool.pytest.ini_options]
 addopts = "-v"
+filterwarnings = [
+    "ignore::pytest.PytestAssertRewriteWarning",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
