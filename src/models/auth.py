@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -13,3 +15,15 @@ class CallbackResponse(BaseModel):
     access_token: str
     token_type: str
     username: str
+    refresh_token: Optional[str] = None
+    expires_in: Optional[int] = None
+    created_at: int
+
+
+class UserResponse(BaseModel):
+    """Response model for /me endpoint."""
+
+    username: str
+    refresh_token: Optional[str] = None
+    created_at: int
+    expires_at: Optional[int] = None
