@@ -9,9 +9,12 @@ import structlog
 from src.core.config import settings
 from src.models.error import (
     AuthError,
+    ConflictError,
     NetworkError,
     NotFoundError,
+    PermissionError,
     RateLimitError,
+    RedirectError,
     ServerError,
     TimeoutError,
     ValidationError,
@@ -97,9 +100,12 @@ class GitHubClient:
                     e,
                     (
                         AuthError,
+                        PermissionError,
                         ValidationError,
                         NotFoundError,
                         RateLimitError,
+                        RedirectError,
+                        ConflictError,
                         ServerError,
                         TimeoutError,
                         NetworkError,
@@ -135,15 +141,23 @@ class GitHubClient:
         self, response: httpx.Response, retry_count: int, max_retries: int
     ) -> Any:
         status = response.status_code
-        if status in [401, 403] and "rate limit" not in response.text.lower():
-            raise AuthError(status=status)
+        if status == 401:
+            raise AuthError(status=401)
+        if status == 403:
+            if "rate limit" in response.text.lower() or "x-ratelimit" in response.headers:
+                return await self._handle_rate_limit(response, retry_count, max_retries)
+            raise PermissionError(status=403)
         if status == 404:
             raise NotFoundError()
+        if status == 301:
+            raise RedirectError()
+        if status == 409:
+            raise ConflictError()
         if status in [400, 422]:
             raise ValidationError(
                 status=status, details=self._get_error_details(response)
             )
-        if status in [403, 429]:
+        if status == 429:
             return await self._handle_rate_limit(response, retry_count, max_retries)
         if status >= 500 and retry_count < max_retries:
             raise _RetryException(1.0 * (2**retry_count))
@@ -182,6 +196,15 @@ class GitHubClient:
         else:
             endpoint = "/user/repos"
         return cast(List[Dict[str, Any]], await self._request("GET", endpoint))
+
+    async def get_user(self) -> Dict[str, Any]:
+        return cast(Dict[str, Any], await self._request("GET", "/user"))
+
+    async def get_repository(self, owner: str, repo: str) -> Dict[str, Any]:
+        return cast(
+            Dict[str, Any],
+            await self._request("GET", f"/repos/{owner}/{repo}"),
+        )
 
     async def list_issues(self, owner: str, repo: str) -> List[Dict[str, Any]]:
         return cast(

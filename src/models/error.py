@@ -36,8 +36,23 @@ class NotFoundError(ApiError):
         super().__init__(status, "not_found", details)
 
 
+class PermissionError(ApiError):
+    def __init__(self, status: int = 403, details: Optional[Any] = None):
+        super().__init__(status, "permission", details)
+
+
+class RedirectError(ApiError):
+    def __init__(self, status: int = 301, details: Optional[Any] = None):
+        super().__init__(status, "redirect", details)
+
+
+class ConflictError(ApiError):
+    def __init__(self, status: int = 409, details: Optional[Any] = None):
+        super().__init__(status, "conflict", details)
+
+
 class RateLimitError(ApiError):
-    def __init__(self, status: int = 403, retry_after: Optional[float] = None):
+    def __init__(self, status: int = 429, retry_after: Optional[float] = None):
         self.retry_after = retry_after
         super().__init__(status, "rate_limit", {"retry_after": retry_after})
 
