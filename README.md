@@ -39,7 +39,7 @@ A robust FastAPI-based application designed to interface with the GitHub API. It
    ```
 
 3. Configure your environment variables in `.env`:
-   - `GITHUB_CLIENT_ID`: Your GitHub OAuth App Client ID.
+   - `OAUTH_CLIENT_ID`: Your GitHub OAuth App Client ID.
    - `GITHUB_CLIENT_SECRET`: Your GitHub OAuth App Client Secret.
    - `OAUTH_SECRET`: A secure key for session encryption.
 
