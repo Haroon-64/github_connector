@@ -37,3 +37,30 @@ async def list_repos(
         raise HTTPException(status_code=e.status, detail=str(e.details))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/repos/{owner}", response_model=List[RepositoryResponse])
+async def list_user_repos(
+    owner: str,
+    client: GitHubClient = Depends(get_github_client),
+) -> Any:
+    try:
+        return await client.get_repositories(username=owner)
+    except Exception as e:
+        if hasattr(e, "status"):
+            raise
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/repos/{owner}/{repo}", response_model=RepositoryResponse)
+async def get_repo(
+    owner: str,
+    repo: str,
+    client: GitHubClient = Depends(get_github_client),
+) -> Any:
+    try:
+        return await client.get_repository(owner, repo)
+    except Exception as e:
+        if hasattr(e, "status"):
+            raise
+        raise HTTPException(status_code=500, detail=str(e))
