@@ -1,0 +1,33 @@
+from typing import Any, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from src.dependencies.github import get_github_client
+from src.github.client import GitHubClient
+from src.models.error import AuthError, NotFoundError, RateLimitError
+from src.models.github import CommitResponse
+
+router = APIRouter()
+
+
+@router.get("/repos/{owner}/{repo}/commits", response_model=List[CommitResponse])
+async def list_commits(
+    owner: str,
+    repo: str,
+    sha: Optional[str] = Query(None),
+    client: GitHubClient = Depends(get_github_client),
+) -> Any:
+    try:
+        return await client.get_commits(owner, repo, sha=sha)
+    except AuthError as e:
+        raise HTTPException(status_code=e.status, detail="Authentication failed")
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Repository or commit not found")
+    except RateLimitError as e:
+        raise HTTPException(
+            status_code=403,
+            detail="Rate limit exceeded",
+            headers={"Retry-After": str(e.retry_after)} if e.retry_after else None,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
