@@ -1,6 +1,8 @@
 import json
+import time
 from unittest.mock import AsyncMock
 
+import pytest
 from src.app import app
 from src.auth.service.github import GitHubAuthError
 from src.dependencies.auth import get_auth_service
@@ -23,10 +25,14 @@ def test_github_login_route(client):
 
 def test_github_callback_route_success(client):
     """Test the /auth/github/callback route success."""
+    now = int(time.time())
     mock_result = {
         "username": "testuser",
         "access_token": "token123",
         "token_type": "bearer",
+        "refresh_token": "refresh123",
+        "expires_in": 3600,
+        "created_at": now,
     }
     mock_service = AsyncMock()
     mock_service.handle_callback.return_value = mock_result
@@ -37,11 +43,20 @@ def test_github_callback_route_success(client):
         response = client.get("/auth/github/callback")
 
         assert response.status_code == 200
-        assert response.json()["username"] == "testuser"
+        data = response.json()
+        assert data["username"] == "testuser"
+        assert data["access_token"] == "token123"
+        assert data["refresh_token"] == "refresh123"
+        assert data["created_at"] == now
+
         # Check if cookie is set by hitting /auth/me
         me_response = client.get("/auth/me")
         assert me_response.status_code == 200
-        assert me_response.json()["username"] == "testuser"
+        me_data = me_response.json()
+        assert me_data["username"] == "testuser"
+        # access_token is no longer in UserResponse
+        assert "access_token" not in me_data
+        assert me_data["created_at"] == now
     finally:
         app.dependency_overrides.clear()
 
@@ -64,19 +79,37 @@ def test_github_callback_route_failure(client):
 
 def test_me_route_authenticated(client):
     """Test the /auth/me route with auth cookie."""
-    user_data = {"username": "testuser", "access_token": "token123"}
+    now = int(time.time())
+    user_data = {
+        "username": "testuser",
+        "access_token": "token123",
+        "refresh_token": "refresh123",
+        "created_at": now,
+        "expires_at": now + 3600,
+    }
     cookie_value = json.dumps(user_data)
 
     client.cookies.set("user_session", cookie_value)
     response = client.get("/auth/me")
 
     assert response.status_code == 200
-    assert response.json() == user_data
+    data = response.json()
+    assert data["username"] == user_data["username"]
+    assert "access_token" not in data
 
 
 def test_me_route_unauthenticated(client):
     """Test the /auth/me route without auth cookie."""
     response = client.get("/auth/me")
-
     assert response.status_code == 401
-    assert response.json() == {"detail": "Not authenticated"}
+    assert response.json() == {"detail": "Not authenticated or session expired"}
+
+
+def test_logout_route(client):
+    """Test the /auth/logout route."""
+    client.cookies.set("user_session", "some-data")
+    response = client.post("/auth/logout")
+    
+    assert response.status_code == 200
+    assert response.json() == {"message": "Logged out successfully"}
+    assert "user_session" not in response.cookies or response.cookies["user_session"] == ""
