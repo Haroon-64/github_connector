@@ -1,17 +1,17 @@
 # GitHub Connector
 
-A robust FastAPI-based application designed to interface with the GitHub API. It features a complete OAuth2 authentication flow, secure session management, and a resilient GitHub client with advanced error handling and rate limiting.
+A FastAPI-based application designed to interface with the GitHub API. It features a complete OAuth2 authentication flow, secure session management, and GitHub client with error handling and rate limiting.
 
 ## Features
 
 - **GitHub OAuth2 Authentication**: Secure login, callback handling, and logout with token revocation.
 - **Session Management**: Uses encrypted, HTTP-only cookies for secure user sessions.
-- **Resilient GitHub Client**:
+- **GitHub Client**:
   - **Automatic Retries**: Implements exponential backoff for network and server errors.
-  - **Rate Limit Handling**: Smartly waits for rate limit resets based on GitHub's API headers.
+  - **Rate Limit Handling**: waits for rate limit resets based on GitHub's API headers.
   - **Pagination Support**: Automatically handles `Link` headers to fetch all pages of results.
-  - **Type-Safe Models**: Robust error mapping to specific exception types.
-- **Comprehensive API Coverage**:
+  - **Type-Safe Models**: error mapping to specific exception types.
+- **API Coverage**:
   - **Repositories**: List user and organization repositories.
   - **Issues**: Create and list issues for any repository.
   - **Pull Requests**: Create pull requests.
@@ -19,7 +19,7 @@ A robust FastAPI-based application designed to interface with the GitHub API. It
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.12+
 - [uv](https://github.com/astral-sh/uv) (recommended) or pip
 - GitHub OAuth App credentials (Client ID and Client Secret)
 
@@ -77,17 +77,17 @@ curl -X POST http://localhost:8000/github/repos/octocat/hello-world/issues \
 ## Requirements Compliance
 
 - **1. Authentication**: Implemented **OAuth 2.0** with secure session management via HTTP-only cookies and token revocation on logout.
-- **2. API Integration**: Implemented **all mandatory and bonus actions**:
+- **2. API Integration**:
   - Fetch user/org repositories.
   - Create and list issues.
   - Create pull requests.
   - Fetch commits.
 - **3. Interface**: Exposed as a **REST API** using FastAPI with auto-generated Swagger/Redoc documentation.
-- **4. Tech Stack**: Built with **Python 3.10+** and **FastAPI**, following modern asynchronous patterns.
-- **5. Code Quality**:
+- **4. Tech Stack**: Built with **Python 3.12+** and **FastAPI**, following modern asynchronous patterns.
+- **5. Code Spec**:
   - **Modularity**: Clearly separated routes, services, models, and core configuration.
   - **Error Handling**: Custom exception hierarchy and exponential backoff for API resilience.
-  - **Testing**: Comprehensive test suite covering authentication flow and GitHub routes.
+  - **Testing**: test suite covering authentication flow and GitHub routes.
 
 ## Project Structure
 
