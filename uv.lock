@@ -472,6 +472,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "types-authlib" },
 ]
 
 [package.metadata]
@@ -495,6 +496,7 @@ dev = [
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "ruff", specifier = ">=0.3.0" },
+    { name = "types-authlib", specifier = ">=1.6.9.20260303" },
 ]
 
 [[package]]
@@ -1231,6 +1233,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f5/24/cb09efec5cc954f7f9b930bf8279447d24618bb6758d4f6adf2574c41780/typer-0.24.1.tar.gz", hash = "sha256:e39b4732d65fbdcde189ae76cf7cd48aeae72919dea1fdfc16593be016256b45", size = 118613, upload-time = "2026-02-21T16:54:40.609Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4a/91/48db081e7a63bb37284f9fbcefda7c44c277b18b0e13fbc36ea2335b71e6/typer-0.24.1-py3-none-any.whl", hash = "sha256:112c1f0ce578bfb4cab9ffdabc68f031416ebcc216536611ba21f04e9aa84c9e", size = 56085, upload-time = "2026-02-21T16:54:41.616Z" },
+]
+
+[[package]]
+name = "types-authlib"
+version = "1.6.9.20260303"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b5/16/305a511b1961c0ded109844c35b0ac7b8b3553297e4ffa69426dd10f449e/types_authlib-1.6.9.20260303.tar.gz", hash = "sha256:4fac492cbfdfec643f195fc97a9d87bf322fba58a1392d800f4ddc84f518d17e", size = 46740, upload-time = "2026-03-03T04:03:40.9Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/88/c6/2dbd6139ed818ef92c09cbbba7cb183c50c0a8f15145ceb9b577d0f320eb/types_authlib-1.6.9.20260303-py3-none-any.whl", hash = "sha256:23909d018137f37f0bc1d2593ede74715250137f41548a49bd39031b48ac75b3", size = 103938, upload-time = "2026-03-03T04:03:39.894Z" },
 ]
 
 [[package]]
