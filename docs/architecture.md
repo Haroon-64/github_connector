@@ -1,0 +1,44 @@
+# System Architecture
+
+The GitHub Connector is built as a modular FastAPI application, prioritizing scalability, resilience, and clear separation of concerns.
+
+## Architectural Layers
+
+### 1. API Layer (FastAPI)
+
+Acts as the entry point for all requests. It handles routing, request validation via Pydantic models, and response serialization.
+
+- **Authentication Routes**: Manage the OAuth2 flow (`/auth/github/login`, `/auth/github/callback`).
+- **GitHub Routes**: Expose GitHub functionalities (repos, issues, etc.) under the `/github` prefix.
+
+### 2. Authentication Service (`src.auth`)
+
+Orchestrates the OAuth2 handshake using `Authlib`.
+
+- **Token Management**: Handles token exchange and revocation.
+- **Session Handling**: Uses `SessionMiddleware` and custom HTTP-only cookies to persist user state securely.
+
+### 3. GitHub Service Layer (`src.github`)
+
+Contains the core business logic for interacting with GitHub.
+
+- **GitHub Client**: A low-level `httpx` based client that implements the "Resilient Client" pattern.
+- **Modular Routes**: Grouped by GitHub resources (Issues, Pulls, Repos, Commits) for maintainability.
+
+### 4. Core & Infrastructure (`src.core`)
+
+Provides cross-cutting concerns:
+
+- **Configuration**: Uses `pydantic-settings` for environment-based configuration and type safety.
+- **Logging**: Implements structured logging with `structlog`.
+
+### 5. Dependency Injection (`src.dependencies`)
+
+Encapsulates service instantiation and authentication checks, making the API layer thin and testable.
+
+## Data Flow
+
+1. **User Login**: User initiates login $\to$ Redirected to GitHub $\to$ Returns to callback.
+2. **Session established**: App stores `user_session` cookie.
+3. **API Request**: User calls `/github/repos` $\to$ `get_current_user` dependency validates cookie $\to$ `GitHubClient` is initialized with the token $\to$ Request is made to GitHub API.
+4. **Resilience**: If GitHub API returns 429 (Rate Limit) or 5xx, the client handles retries internally before returning to the route handler.

@@ -48,6 +48,7 @@ A robust FastAPI-based application designed to interface with the GitHub API. It
 Using `uv`:
 
 ```bash
+uv sync
 uv run dev
 ```
 
@@ -64,6 +65,14 @@ The API will be available at `http://localhost:8000`.
 - **Interactive API Docs**: Once running, visit [http://localhost:8000/docs](http://localhost:8000/docs) for Swagger UI.
 - **Architecture**: See [docs/architecture.md](docs/architecture.md) for a deep dive into the system design.
 - **Design Decisions**: See [docs/design_decisions.md](docs/design_decisions.md) for rationale behind technical choices.
+
+### Example Request
+
+```sh
+curl -X POST http://localhost:8000/github/repos/octocat/hello-world/issues \
+-H "Authorization: Bearer <TOKEN>" \
+-d '{"title":"Bug","body":"test"}'
+```
 
 ## Requirements Compliance
 
