@@ -38,10 +38,18 @@ A FastAPI-based application designed to interface with the GitHub API. It featur
    cp .env.example .env
    ```
 
-3. Configure your environment variables in `.env`:
-   - `OAUTH_CLIENT_ID`: Your GitHub OAuth App Client ID.
-   - `GITHUB_CLIENT_SECRET`: Your GitHub OAuth App Client Secret.
-   - `OAUTH_SECRET`: A secure key for session encryption.
+3. Configure OAuth
+    1. Go to [https://github.com/settings/applications/new](https://github.com/settings/applications/new)
+    2. Fill in the following fields:
+          - **Application name**: GitHub Connector
+          - **Homepage URL**: <http://localhost:8000>
+          - **Authorization callback URL**: <http://localhost:8000/auth/github/callback>
+    3. Click on **Register application**
+    4. Copy the **Client ID** and **Client Secret**
+    5. Paste them in the `.env` file
+    - `OAUTH_CLIENT_ID`: Your GitHub OAuth App Client ID.
+    - `GITHUB_CLIENT_SECRET`: Your GitHub OAuth App Client Secret.
+    - `OAUTH_SECRET`: A secure key for session encryption. Generate a random string of 32 characters.
 
 ## Running the Application
 
