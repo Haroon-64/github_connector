@@ -51,7 +51,6 @@ async def github_callback(
         user_data = {
             "username": result["username"],
             "access_token": result["access_token"],
-            "refresh_token": result.get("refresh_token"),
             "created_at": result["created_at"],
             "expires_at": expires_at,
         }
@@ -66,7 +65,6 @@ async def github_callback(
             access_token=result["access_token"],
             token_type=result["token_type"],
             username=result["username"],
-            refresh_token=result.get("refresh_token"),
             expires_in=result.get("expires_in"),
             created_at=result["created_at"],
         )

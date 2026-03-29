@@ -1,9 +1,12 @@
 import time
-from typing import Any, Dict, cast
+from typing import Any, Dict, Optional
 
+import httpx
 import structlog
 from authlib.integrations.starlette_client import OAuth
 from starlette.requests import Request
+
+from src.core.config import settings
 
 logger = structlog.get_logger(__name__)
 
@@ -23,10 +26,22 @@ class GitHubAuthService:
     def __init__(self, oauth: OAuth):
         self.oauth = oauth
 
-    async def get_login_url(self, request: Request, redirect_uri: str) -> str:
+    async def get_login_url(
+        self,
+        request: Request,
+        redirect_uri: str,
+        scope: Optional[str] = None,
+    ) -> str:
         """Generate GitHub OAuth login URL."""
         try:
-            response = await self.oauth.github.authorize_redirect(request, redirect_uri)
+            kwargs: Dict[str, Any] = {}
+            if scope:
+                kwargs["scope"] = scope
+
+            response = await self.oauth.github.authorize_redirect(
+                request, redirect_uri, **kwargs
+            )
+            logger.debug("response", response=response)
             login_url = str(response.headers.get("Location", ""))
             logger.info("login_url_generated", url=login_url)
             return login_url
@@ -41,6 +56,8 @@ class GitHubAuthService:
             user_data = user_info.json()
             logger.info("oauth_callback_success", username=user_data.get("login"))
 
+            logger.debug("token", token=token, user_data=user_data, user_info=user_info)
+
             created_at = int(time.time())
 
             return {
@@ -48,43 +65,14 @@ class GitHubAuthService:
                 "token_type": token["token_type"],
                 "username": user_data["login"],
                 "user_data": user_data,
-                "refresh_token": token.get("refresh_token"),
-                "expires_in": token.get("expires_in"),
                 "created_at": created_at,
             }
         except Exception as e:
             raise GitHubAuthError(f"OAuth callback failed: {str(e)}")
 
-    async def refresh_access_token(self, refresh_token: str) -> Dict[str, Any]:
-        """Refresh the GitHub access token using Authlib."""
-        try:
-            from src.core.config import settings
-
-            # Using Authlib's client to refresh
-            # GitHub's refresh token endpoint is the same as the token endpoint
-            token_endpoint = "https://github.com/login/oauth/access_token"
-
-            new_token = await self.oauth.github.fetch_access_token(
-                url=token_endpoint,
-                grant_type="refresh_token",
-                refresh_token=refresh_token,
-                client_id=settings.OAUTH_CLIENT_ID,
-                client_secret=settings.OAUTH_SECRET,
-            )
-            logger.info("token_refreshed_successfully")
-
-            new_token["created_at"] = int(time.time())
-            return cast(Dict[str, Any], new_token)
-        except Exception as e:
-            raise GitHubAuthError(f"Failed to refresh token via Authlib: {str(e)}")
-
     async def revoke_token(self, access_token: str) -> None:
         """Revoke the GitHub access token."""
         try:
-            import httpx
-
-            from src.core.config import settings
-
             url = (
                 f"https://api.github.com/applications/{settings.OAUTH_CLIENT_ID}/token"
             )
@@ -103,5 +91,3 @@ class GitHubAuthService:
                     logger.info("token_revoked_successfully")
         except Exception as e:
             logger.error("token_revocation_error", error=str(e))
-            # Silence revocation errors during logout to ensure session is cleared
-            pass
