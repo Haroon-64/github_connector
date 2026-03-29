@@ -30,7 +30,6 @@ def test_github_callback_route_success(client):
         "username": "testuser",
         "access_token": "token123",
         "token_type": "bearer",
-        "refresh_token": "refresh123",
         "expires_in": 3600,
         "created_at": now,
     }
@@ -46,7 +45,6 @@ def test_github_callback_route_success(client):
         data = response.json()
         assert data["username"] == "testuser"
         assert data["access_token"] == "token123"
-        assert data["refresh_token"] == "refresh123"
         assert data["created_at"] == now
 
         # Check if cookie is set by hitting /auth/me
@@ -83,7 +81,6 @@ def test_me_route_authenticated(client):
     user_data = {
         "username": "testuser",
         "access_token": "token123",
-        "refresh_token": "refresh123",
         "created_at": now,
         "expires_at": now + 3600,
     }
