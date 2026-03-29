@@ -1,10 +1,11 @@
 import json
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from src.auth.service.github import GitHubAuthError, GitHubAuthService
 from src.core.config import settings
+from src.core.constants import GITHUB_SCOPES
 from src.dependencies.auth import (
     get_auth_service,
     get_current_user,
@@ -18,12 +19,21 @@ auth_router = APIRouter()
 @auth_router.get("/github/login", response_model=LoginResponse)
 async def github_login(
     request: Request,
+    scope: Optional[str] = Query(
+        " ".join(GITHUB_SCOPES),
+        description=(
+            "A space-delimited list of scopes. "
+            f"Allowed scopes: {', '.join(GITHUB_SCOPES)}"
+        ),
+    ),
     auth_service: GitHubAuthService = Depends(get_auth_service),
 ) -> LoginResponse:
     """Initiate GitHub OAuth login flow."""
     try:
         login_url = await auth_service.get_login_url(
-            request, settings.GITHUB_REDIRECT_URI
+            request,
+            redirect_uri=settings.GITHUB_REDIRECT_URI,
+            scope=scope,
         )
         return LoginResponse(login_url=login_url)
     except GitHubAuthError as e:
