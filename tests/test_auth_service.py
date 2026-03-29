@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -66,3 +66,32 @@ async def test_handle_callback_failure(mock_oauth, mock_request):
         await service.handle_callback(mock_request)
 
     assert "OAuth callback failed" in str(exc.value)
+
+@pytest.mark.anyio
+@patch("httpx.AsyncClient.request")
+async def test_revoke_token_success(mock_request):
+    """Test revoking token successfully."""
+    mock_response = MagicMock()
+    mock_response.status_code = 204
+    mock_request.return_value = mock_response
+
+    mock_oauth = MagicMock()
+    service = GitHubAuthService(mock_oauth)
+
+    # Should not raise exception
+    await service.revoke_token("token123")
+    mock_request.assert_called_once()
+
+
+@pytest.mark.anyio
+@patch("httpx.AsyncClient.request")
+async def test_revoke_token_failure(mock_request):
+    """Test revoking token with failure being gracefully caught."""
+    mock_request.side_effect = Exception("Network error")
+
+    mock_oauth = MagicMock()
+    service = GitHubAuthService(mock_oauth)
+
+    # Should catch exception and log it, not raise
+    await service.revoke_token("token123")
+    mock_request.assert_called_once()
