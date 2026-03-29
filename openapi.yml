@@ -1,0 +1,623 @@
+openapi: 3.1.0
+info:
+  title: GitHub Connector
+  description: FastAPI-based GitHub Connector
+  version: 1.0.0
+paths:
+  /auth/github/login:
+    get:
+      summary: Github Login
+      description: Initiate GitHub OAuth login flow.
+      operationId: github_login_auth_github_login_get
+      parameters:
+        - name: scope
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description:
+              "A space-delimited list of scopes. Allowed scopes: user:email,
+              repo, read:user"
+            default: user:email repo read:user
+            title: Scope
+          description:
+            "A space-delimited list of scopes. Allowed scopes: user:email,
+            repo, read:user"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+  /auth/logout:
+    post:
+      summary: Logout
+      description: Log out the user by clearing the session cookie and revoking the token.
+      operationId: logout_auth_logout_post
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                title: Response Logout Auth Logout Post
+  /auth/me:
+    get:
+      summary: Get Me
+      description: Get currently authenticated user info.
+      operationId: get_me_auth_me_get
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+  /github/repos:
+    get:
+      tags:
+        - repos
+      summary: List Repos
+      operationId: list_repos_github_repos_get
+      parameters:
+        - name: username
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Username
+        - name: org
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Org
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RepositoryResponse"
+                title: Response List Repos Github Repos Get
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+  /github/repos/{owner}:
+    get:
+      tags:
+        - repos
+      summary: List User Repos
+      operationId: list_user_repos_github_repos__owner__get
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Owner
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RepositoryResponse"
+                title: Response List User Repos Github Repos  Owner  Get
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+  /github/repos/{owner}/{repo}:
+    get:
+      tags:
+        - repos
+      summary: Get Repo
+      operationId: get_repo_github_repos__owner___repo__get
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Owner
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Repo
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepositoryResponse"
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+  /github/repos/{owner}/{repo}/issues:
+    post:
+      tags:
+        - issues
+      summary: Create Issue
+      operationId: create_issue_github_repos__owner___repo__issues_post
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Owner
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Repo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IssueRequest"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssueResponse"
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+    get:
+      tags:
+        - issues
+      summary: List Issues
+      operationId: list_issues_github_repos__owner___repo__issues_get
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Owner
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Repo
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IssueResponse"
+                title: Response List Issues Github Repos  Owner   Repo  Issues Get
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+  /github/repos/{owner}/{repo}/pulls:
+    post:
+      tags:
+        - pulls
+      summary: Create Pull
+      operationId: create_pull_github_repos__owner___repo__pulls_post
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Owner
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Repo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PullRequestRequest"
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullRequestResponse"
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+  /github/repos/{owner}/{repo}/commits:
+    get:
+      tags:
+        - commits
+      summary: List Commits
+      operationId: list_commits_github_repos__owner___repo__commits_get
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Owner
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Repo
+        - name: sha
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Sha
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CommitResponse"
+                title: Response List Commits Github Repos  Owner   Repo  Commits Get
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+components:
+  schemas:
+    CommitResponse:
+      properties:
+        sha:
+          type: string
+          title: Sha
+        commit:
+          additionalProperties: true
+          type: object
+          title: Commit
+        author:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+          title: Author
+        html_url:
+          type: string
+          title: Html Url
+        url:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Url
+      type: object
+      required:
+        - sha
+        - commit
+        - html_url
+      title: CommitResponse
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: "#/components/schemas/ValidationError"
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    IssueRequest:
+      properties:
+        title:
+          type: string
+          title: Title
+        body:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Body
+        assignees:
+          anyOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          title: Assignees
+        labels:
+          anyOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          title: Labels
+      type: object
+      required:
+        - title
+      title: IssueRequest
+    IssueResponse:
+      properties:
+        id:
+          type: integer
+          title: Id
+        number:
+          type: integer
+          title: Number
+        title:
+          type: string
+          title: Title
+        state:
+          type: string
+          title: State
+        user:
+          additionalProperties: true
+          type: object
+          title: User
+        body:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Body
+        pull_request:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+          title: Pull Request
+        created_at:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Created At
+        updated_at:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Updated At
+      type: object
+      required:
+        - id
+        - number
+        - title
+        - state
+        - user
+      title: IssueResponse
+    LoginResponse:
+      properties:
+        login_url:
+          type: string
+          title: Login Url
+      type: object
+      required:
+        - login_url
+      title: LoginResponse
+      description: Response model for login endpoint.
+    PullRequestRequest:
+      properties:
+        title:
+          type: string
+          title: Title
+        head:
+          type: string
+          title: Head
+        base:
+          type: string
+          title: Base
+        body:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Body
+      type: object
+      required:
+        - title
+        - head
+        - base
+      title: PullRequestRequest
+    PullRequestResponse:
+      properties:
+        id:
+          type: integer
+          title: Id
+        number:
+          type: integer
+          title: Number
+        title:
+          type: string
+          title: Title
+        state:
+          type: string
+          title: State
+        body:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Body
+        user:
+          additionalProperties: true
+          type: object
+          title: User
+        head:
+          additionalProperties: true
+          type: object
+          title: Head
+        base:
+          additionalProperties: true
+          type: object
+          title: Base
+        html_url:
+          type: string
+          title: Html Url
+        created_at:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Created At
+        updated_at:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Updated At
+      type: object
+      required:
+        - id
+        - number
+        - title
+        - state
+        - user
+        - head
+        - base
+        - html_url
+      title: PullRequestResponse
+    RepositoryResponse:
+      properties:
+        id:
+          type: integer
+          title: Id
+        name:
+          type: string
+          title: Name
+        full_name:
+          type: string
+          title: Full Name
+        private:
+          type: boolean
+          title: Private
+        owner:
+          additionalProperties: true
+          type: object
+          title: Owner
+        html_url:
+          type: string
+          title: Html Url
+        description:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Description
+        fork:
+          type: boolean
+          title: Fork
+        url:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Url
+        created_at:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Created At
+        updated_at:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Updated At
+        pushed_at:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Pushed At
+      type: object
+      required:
+        - id
+        - name
+        - full_name
+        - private
+        - owner
+        - html_url
+        - fork
+      title: RepositoryResponse
+    UserResponse:
+      properties:
+        username:
+          type: string
+          title: Username
+        created_at:
+          type: integer
+          title: Created At
+        expires_at:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Expires At
+      type: object
+      required:
+        - username
+        - created_at
+      title: UserResponse
+      description: Response model for /me endpoint.
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+              - type: string
+              - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      title: ValidationError
