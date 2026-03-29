@@ -1,6 +1,6 @@
 # GitHub API Reference
 
-This document summarizes the GitHub API endpoints and their expected responses for the connector.
+This document summarizes the [GitHub API](https://docs.github.com/en/rest) endpoints and their expected responses for the connector.
 
 ## Auth Check (User)
 
@@ -9,18 +9,42 @@ GET /user
 Authorization: Bearer <TOKEN>
 ```
 
-### Responses
+* > Responses
 
 * 200 OK → valid token, returns user
 * 401 Unauthorized → invalid/expired token
 * 403 Forbidden → token valid but blocked (rate limit, scope)
 * 404 Not Found → rare, malformed request
-
-### Missing cases (must handle)
-
 * 429 Too Many Requests (rate limit)
 * 500 GitHub internal error
 
+### Callback
+
+the callback on oauth by default dont expire
+
+```json
+"token": {
+    "access_token": "gho_Zxx",
+    "token_type": "bearer",
+    "scope": "read:user,repo,user:email"
+  }
+```
+
+### Revoke OAuth Token
+
+DELETE /applications/{client_id}/token
+
+```sh
+curl -L \
+  -X DELETE \
+  -H "Accept: application/vnd.github+json" \
+  -u "<YOUR_CLIENT_ID>:<YOUR_CLIENT_SECRET>" \
+  -H "X-GitHub-Api-Version: 2026-03-10" \
+  <https://api.github.com/applications/Iv1.8a61f9b3a7aba766/token> \
+  -d '{"access_token":"e72e16c7e42f292c6912e7710c838347ae178b4a"}'```
+
+200 -  ok
+422 -  validation failed
 ---
 
 ## Repos
@@ -29,14 +53,12 @@ Authorization: Bearer <TOKEN>
 GET /repos/{owner}/{repo}
 ```
 
-### Responses
+* > Responses
 
 * 200 OK → repo data
 * 301 Moved Permanently → repo renamed
 * 403 Forbidden → private repo / no scope
 * 404 Not Found → repo missing
-
-### Missing cases
 
 * 304 Not Modified (etag caching)
 * 401 Unauthorized
@@ -52,14 +74,12 @@ GET /repos/{owner}/{repo}
 GET /repos/{owner}/{repo}/issues
 ```
 
-### Responses
+* > Responses
 
 * 200 OK → issues list (includes PRs)
 * 301 Moved Permanently
 * 403 Forbidden
 * 404 Not Found
-
-### Missing cases
 
 * 410 Gone → issues disabled
 * 401 Unauthorized
@@ -83,7 +103,7 @@ POST /repos/{owner}/{repo}/issues
 }
 ```
 
-### Responses
+* > Responses
 
 * 201 Created
 * 400 Bad Request
@@ -100,7 +120,7 @@ POST /repos/{owner}/{repo}/issues
 POST /repos/{owner}/{repo}/pulls
 ```
 
-### Responses
+* > Responses
 
 * 201 Created
 * 422 Validation failed (branch issues)
@@ -115,7 +135,7 @@ POST /repos/{owner}/{repo}/pulls
 GET /repos/{owner}/{repo}/commits
 ```
 
-### Responses
+* > Responses
 
 * 200 OK
 * 409 Conflict → empty repo

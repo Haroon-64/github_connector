@@ -10,10 +10,7 @@ This document outlines the key technical decisions made during the development o
 
 - **Security**: Cookies with `httponly=True` and `samesite="lax"` prevent XSS-based token theft.
 - **Simplicity**: Simplifies the frontend integration as the browser automatically handles session persistence.
-
-### Decision: Token Revocation on Logout
-
-**Rationale**: When a user logs out, we explicitly call GitHub's revocation endpoint. This ensures that even if a session cookie is compromised after logout, the token is invalidated on GitHub's side.
+- **Note**: GitHub OAuth tokens do not expire by default. We should add revocation mechanism in future. for now use /logout
 
 ## 2. GitHub Client Resilience
 
