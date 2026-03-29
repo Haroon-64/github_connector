@@ -4,13 +4,14 @@ This document outlines the key technical decisions made during the development o
 
 ## 1. OAuth2 Implementation Strategy
 
-### Decision: State-based redirection with Cookie-based Session
+### Decision: Secret session_id with In-Memory Session Cache
 
-**Rationale**: Instead of standard stateless JWTs, we used `SessionMiddleware` and HTTP-only cookies.
+**Rationale**: Instead of storing the entire user state (including the GitHub `access_token`) in a JSON string cookie, we generate a cryptographically secure `session_id`.
 
-- **Security**: Cookies with `httponly=True` and `samesite="lax"` prevent XSS-based token theft.
-- **Simplicity**: Simplifies the frontend integration as the browser automatically handles session persistence.
-- **Note**: GitHub OAuth tokens do not expire by default. We should add revocation mechanism in future. for now use /logout
+- **Security**: Cookies with `httponly=True`, `secure=True`, and `samesite="lax"` prevent XSS-based token theft and eavesdropping.
+- **Server Cache**: The `access_token` and user data are stored securely on the server in a dictionary (`SESSION_CACHE`), avoiding raw token exposure in the browser.
+- **Bearer Validation**: Incoming Bearer tokens are actively validated using the GitHub API and cached in `TOKEN_CACHE` to avoid repeated calls while ensuring security.
+- **Note**: GitHub OAuth tokens do not expire by default. Use `/logout` for revocation.
 
 ## 2. GitHub Client Resilience
 
@@ -57,8 +58,8 @@ To maintain the project's focus as a "simple cloud connector", the following ite
 
 ### 1. Persistent Database
 
-- **Status**: Skipped.
-- **Rationale**: User sessions and OAuth states are managed through encrypted cookies and memory-based middleware. Introducing a database (e.g., PostgreSQL/Redis) would add significant deployment complexity (Docker, migrations, etc.) that was outside the "simple connector" core requirement.
+- **Status**: Limited (In-Memory).
+- **Rationale**: User sessions and OAuth states are managed through secret session IDs and memory-based caches (`SESSION_CACHE`, `TOKEN_CACHE`). Introducing a full-featured database (e.g., PostgreSQL/Redis) would add significant deployment complexity. For current scale, in-memory structures are sufficient, with clear "TODO" markers for when persistent storage becomes necessary.
 
 ### 2. Frontend Application
 

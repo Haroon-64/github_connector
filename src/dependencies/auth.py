@@ -1,5 +1,3 @@
-import json
-import time
 from typing import Any, Dict, Optional, cast
 
 import structlog
@@ -7,6 +5,8 @@ from fastapi import Depends, HTTPException, Request, status
 
 from src.auth.oauth import oauth
 from src.auth.service.github import GitHubAuthService
+from src.core.session import SESSION_CACHE, TOKEN_CACHE
+from src.github.client import GitHubClient
 
 logger = structlog.get_logger(__name__)
 
@@ -19,26 +19,15 @@ def get_auth_service() -> GitHubAuthService:
 def get_session_user(
     request: Request,
 ) -> Optional[Dict[str, Any]]:
-    """Dependency to get user from session cookie, handling refresh if needed."""
-    cookie_user = request.cookies.get("user_session")
-    if not cookie_user:
+    """Dependency to get user from session cookie."""
+    session_id = request.cookies.get("user_session")
+    if not session_id:
         return None
 
-    try:
-        user_data = json.loads(cookie_user)
-        # Check for expiration
-        expires_at = user_data.get("expires_at")
-        if expires_at and time.time() > expires_at:
-            logger.debug("session_expired")
-            return None
-
-        return cast(Dict[str, Any], user_data)
-    except (json.JSONDecodeError, KeyError) as e:
-        logger.error("session_parse_failed", error=str(e))
-        return None
+    return SESSION_CACHE.get(session_id)
 
 
-def get_optional_user(
+async def get_optional_user(
     request: Request,
     user: Optional[Dict[str, Any]] = Depends(get_session_user),
 ) -> Optional[Dict[str, Any]]:
@@ -46,7 +35,21 @@ def get_optional_user(
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.replace("Bearer ", "").strip()
-        return {"access_token": token, "username": "api_user"}
+
+        if token in TOKEN_CACHE:
+            return {"access_token": token, "username": TOKEN_CACHE[token]}
+
+        try:
+            client = GitHubClient(token)
+            user_data = await client.get_user()
+            await client.aclose()
+
+            username = user_data["login"]
+            TOKEN_CACHE[token] = username
+            return {"access_token": token, "username": username}
+        except Exception as e:
+            logger.warning("bearer_token_validation_failed", error=str(e))
+            return None
 
     return user
 

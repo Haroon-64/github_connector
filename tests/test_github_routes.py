@@ -1,10 +1,11 @@
-import json
+import secrets
 import time
 from unittest.mock import AsyncMock
 
 import pytest
 
 from src.app import app
+from src.core.session import SESSION_CACHE
 from src.dependencies.github import get_github_client, get_optional_github_client
 from src.models.error import NotFoundError, RateLimitError, ValidationError
 
@@ -16,9 +17,11 @@ def auth_cookie(client):
         "username": "testuser",
         "access_token": "gho_test_token",
         "created_at": now,
-        "expires_at": now + 3600,
     }
-    client.cookies.set("user_session", json.dumps(user_data))
+
+    session_id = secrets.token_urlsafe(32)
+    SESSION_CACHE[session_id] = user_data
+    client.cookies.set("user_session", session_id)
     return user_data
 
 

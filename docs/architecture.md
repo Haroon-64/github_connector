@@ -16,7 +16,8 @@ Acts as the entry point for all requests. It handles routing, request validation
 Orchestrates the OAuth2 handshake using `Authlib`.
 
 - **Token Management**: Handles token exchange and revocation.
-- **Session Handling**: Uses `SessionMiddleware` and custom HTTP-only cookies to persist user state securely.
+- **Session Handling**: Uses custom HTTP-only, secure cookies to store a `session_id`. The actual user state (including the GitHub `access_token`) is stored in an in-memory `SESSION_CACHE`.
+- **Bearer Token Validation**: Actively validates incoming `Authorization: Bearer` tokens by resolving them against the GitHub API and caching the result in `TOKEN_CACHE`.
 
 ### 3. GitHub Service Layer (`src.github`)
 
@@ -39,6 +40,9 @@ Encapsulates service instantiation and authentication checks, making the API lay
 ## Data Flow
 
 1. **User Login**: User initiates login $\to$ Redirected to GitHub $\to$ Returns to callback.
-2. **Session established**: App stores `user_session` cookie.
-3. **API Request**: User calls `/github/repos` $\to$ `get_current_user` dependency validates cookie $\to$ `GitHubClient` is initialized with the token $\to$ Request is made to GitHub API.
+2. **Session established**: App generates a secure `session_id`, stores user data in `SESSION_CACHE`, and sets a `user_session` cookie on the client.
+3. **API Request**:
+    - **Cookie Auth**: User calls an endpoint $\to$ `get_session_user` retrieves data from `SESSION_CACHE`.
+    - **Bearer Auth**: User provides a token $\to$ `get_optional_user` validates the token with GitHub (and `TOKEN_CACHE`) to resolve the username.
+    - **Client Init**: `GitHubClient` is initialized with the resolved token $\to$ Request is made to GitHub API.
 4. **Resilience**: If GitHub API returns 429 (Rate Limit) or 5xx, the client handles retries internally before returning to the route handler.
