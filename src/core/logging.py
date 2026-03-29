@@ -103,6 +103,6 @@ def setup_logging() -> structlog.BoundLogger:
         "uvicorn.access",
         "anyio",
     ]:
-        logging.getLogger(logger_name).setLevel(logging.INFO)
+        logging.getLogger(logger_name).setLevel(logging.ERROR)
 
     return cast(structlog.BoundLogger, structlog.get_logger("github_connector"))
