@@ -1,4 +1,5 @@
 import asyncio
+import random
 import re
 import time
 from typing import Any, Dict, List, Optional, cast
@@ -7,6 +8,7 @@ import httpx
 import structlog
 
 from src.core.config import settings
+from src.github.retry_policy import GitHubRetryPolicy, RetryDecision, RetryType
 from src.models.error import (
     AuthError,
     ConflictError,
@@ -23,11 +25,6 @@ from src.models.error import (
 logger = structlog.get_logger(__name__)
 
 
-class _RetryException(Exception):
-    def __init__(self, wait_time: float):
-        self.wait_time = wait_time
-
-
 class GitHubClient:
     def __init__(self, access_token: str):
         self.base_url = settings.GITHUB_API_URL
@@ -37,6 +34,21 @@ class GitHubClient:
             "X-GitHub-Api-Version": "2022-11-28",
         }
         self.timeout = 10.0
+        self._client: Optional[httpx.AsyncClient] = None
+        self._rate_limit_remaining: Optional[int] = None
+        self._rate_limit_reset: Optional[float] = None
+        self.retry_policy = GitHubRetryPolicy(max_time=300.0)
+
+    @property
+    def client(self) -> httpx.AsyncClient:
+        if self._client is None:
+            self._client = httpx.AsyncClient(timeout=self.timeout, headers=self.headers)
+        return self._client
+
+    async def aclose(self) -> None:
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
 
     def _parse_link_header(self, header: str) -> Dict[str, str]:
         links: Dict[str, str] = {}
@@ -50,198 +62,171 @@ class GitHubClient:
                 links[rel] = url
         return links
 
+    def _get_error_details(self, response: httpx.Response) -> Any:
+        try:
+            return response.json()
+        except Exception:
+            logger.error("failed_to_parse_error_response", response=response.text)
+            return response.text
+
+    async def _throttle_and_pace(self) -> None:
+        if self._rate_limit_remaining is None or self._rate_limit_reset is None:
+            return
+
+        wait_time = 0.0
+        if self._rate_limit_remaining <= 0:
+            wait_time = max(0.01, self._rate_limit_reset - time.time())
+            wait_time += random.uniform(0, 1)
+        elif self._rate_limit_remaining < 100:
+            time_to_reset = max(0.01, self._rate_limit_reset - time.time())
+            wait_time = time_to_reset / max(1, self._rate_limit_remaining)
+
+        if wait_time > 0:
+            logger.debug("github_request_pacing_or_throttle", wait=wait_time)
+            await asyncio.sleep(wait_time)
+
+    def _update_rate_limit_headers(self, response: httpx.Response) -> None:
+        remaining = response.headers.get("x-ratelimit-remaining")
+        reset = response.headers.get("x-ratelimit-reset")
+        if remaining is not None:
+            self._rate_limit_remaining = int(remaining)
+        if reset is not None:
+            self._rate_limit_reset = float(reset)
+
     async def _request(
         self,
         method: str,
         endpoint: str,
         params: Optional[Dict[str, Any]] = None,
         json_data: Optional[Dict[str, Any]] = None,
-        max_retries: int = 3,
     ) -> Any:
-        url = f"{self.base_url}/{endpoint.lstrip('/')}"
-        retry_count = 0
+        url: Optional[str] = f"{self.base_url}/{endpoint.lstrip('/')}"
+        all_data = None
 
-        while retry_count <= max_retries:
-            logger.debug(
-                "github_request_attempt", method=method, url=url, retry=retry_count
+        while url:
+            page_data, next_url = await self._fetch_page_with_retries(
+                method, url, params, json_data
             )
-            try:
-                return await self._execute_request_attempt(
-                    method, url, params, json_data, retry_count, max_retries
-                )
-            except _RetryException as e:
-                logger.warning("github_request_retry", wait=e.wait_time)
-                retry_count += 1
-                await asyncio.sleep(e.wait_time)
-                continue
-            except httpx.TimeoutException:
-                if retry_count < max_retries:
-                    retry_count += 1
-                    continue
-                raise TimeoutError()
-            except httpx.RequestError:
-                raise NetworkError()
-            except Exception as e:
-                self._raise_if_api_error(e)
 
-    def _raise_if_api_error(self, e: Exception) -> None:
-        if isinstance(
-            e,
-            (
-                AuthError,
-                PermissionError,
-                ValidationError,
-                NotFoundError,
-                RateLimitError,
-                RedirectError,
-                ConflictError,
-                ServerError,
-                TimeoutError,
-                NetworkError,
-            ),
-        ):
-            raise e
-        raise ServerError()
+            if all_data is None:
+                all_data = page_data
+            elif isinstance(all_data, list) and isinstance(page_data, list):
+                all_data.extend(page_data)
 
-    async def _proactive_throttle(self, response: httpx.Response) -> None:
-        """Throttles proactively if remaining rate limit hits zero."""
-        remaining = response.headers.get("x-ratelimit-remaining")
-        if remaining and int(remaining) == 0:
-            reset = response.headers.get("x-ratelimit-reset")
-            if reset:
-                wait_time = max(0.01, float(reset) - time.time())
-                logger.warning("proactive_throttle_sleep", wait=wait_time)
-                await asyncio.sleep(wait_time)
+            url = next_url
+            params = None
 
-    async def _handle_response(
+        return all_data
+
+    def _handle_network_exception(
         self,
-        response: httpx.Response,
+        e: Exception,
+        attempt_counts: Dict[RetryType, int],
+    ) -> RetryDecision:
+        return self.retry_policy.evaluate_exception(e, attempt_counts)
+
+    def _finalize_response(self, response: httpx.Response, method: str) -> Any:
+        status = response.status_code
+        if status in (200, 201):
+            return self._process_success_response(response, method)
+        if status == 204:
+            return None, None
+        self._raise_for_status(response)
+
+    def _check_stop_limits(
+        self,
+        decision: RetryDecision,
+        attempt_counts: Dict[RetryType, int],
+        start_time: float,
+    ) -> None:
+        if self.retry_policy.should_stop(decision, attempt_counts, start_time):
+            if decision.retry_type == RetryType.RATE_LIMIT:
+                raise RateLimitError()
+            if decision.retry_type == RetryType.SERVER:
+                raise ServerError()
+            if decision.retry_type == RetryType.TIMEOUT:
+                raise TimeoutError()
+            raise NetworkError()
+
+    async def _fetch_page_with_retries(
+        self,
         method: str,
-        retry_count: int,
-        max_retries: int,
+        url: str,
+        params: Optional[Dict[str, Any]],
+        json_data: Optional[Dict[str, Any]],
     ) -> Any:
-        if response.status_code in [200, 201]:
-            return await self._process_success(response, method)
-        if response.status_code == 204:
-            return None
-        return self._handle_error_response(response, retry_count, max_retries)
+        start_time = time.time()
+        attempt_counts = {
+            RetryType.RATE_LIMIT: 0,
+            RetryType.SERVER: 0,
+            RetryType.NETWORK: 0,
+            RetryType.TIMEOUT: 0,
+        }
 
-    async def _process_success(self, response: httpx.Response, method: str) -> Any:
-        if method == "GET" and "Link" in response.headers:
-            links = self._parse_link_header(response.headers["Link"])
-            data = response.json()
-            if isinstance(data, list) and "next" in links:
-                next_url = links["next"]
-                if next_url.startswith(self.base_url):
-                    next_url = next_url[len(self.base_url) :]
-                next_data = await self._request("GET", next_url)
-                return data + next_data
-            return data
-        return response.json() if response.content else None
+        while True:
+            await self._throttle_and_pace()
 
-    def _handle_error_response(
-        self, response: httpx.Response, retry_count: int, max_retries: int
-    ) -> Any:
+            try:
+                response = await self.client.request(
+                    method, url, params=params, json=json_data
+                )
+                self._update_rate_limit_headers(response)
+                decision = self.retry_policy.evaluate_response(response, attempt_counts)
+
+            except (httpx.TimeoutException, httpx.RequestError) as e:
+                decision = self._handle_network_exception(e, attempt_counts)
+
+            if decision is None:
+                return self._finalize_response(response, method)
+
+            attempt_counts[decision.retry_type] += 1
+            self._check_stop_limits(decision, attempt_counts, start_time)
+
+            logger.warning(
+                "github_request_retry",
+                wait=decision.wait,
+                retry_type=decision.retry_type.name,
+                attempt=attempt_counts[decision.retry_type],
+            )
+
+            await asyncio.sleep(decision.wait)
+
+    def _process_success_response(self, response: httpx.Response, method: str) -> Any:
+        page_data = response.json() if response.content else None
+        next_url = None
+        if method == "GET" and isinstance(page_data, list):
+            next_url = self._extract_next_url(response.headers)
+        return page_data, next_url
+
+    def _extract_next_url(self, headers: httpx.Headers) -> Optional[str]:
+        if "Link" in headers:
+            links = self._parse_link_header(headers["Link"])
+            if "next" in links:
+                url = links["next"]
+                if not url.startswith(self.base_url):
+                    url = f"{self.base_url}/{url.lstrip('/')}"
+                return url
+        return None
+
+    def _raise_for_status(self, response: httpx.Response) -> None:
         status = response.status_code
         if status == 401:
             raise AuthError(status=401)
         if status == 403:
-            return self._handle_403_error(response, retry_count, max_retries)
+            raise PermissionError(status=403)
         if status == 404:
             raise NotFoundError()
         if status == 301:
             raise RedirectError()
         if status == 409:
             raise ConflictError()
+        if status == 429:
+            raise RateLimitError()
         if status in [400, 422]:
             raise ValidationError(
                 status=status, details=self._get_error_details(response)
             )
-        if status == 429:
-            return self._handle_429_error(response, retry_count, max_retries)
-        if status >= 500 and retry_count < max_retries:
-            raise _RetryException(1.0 * (2**retry_count))
         raise ServerError()
-
-    def _handle_403_error(
-        self, response: httpx.Response, retry_count: int, max_retries: int
-    ) -> Any:
-        headers = response.headers
-        body = response.text.lower()
-
-        if "retry-after" in headers:
-            return self._handle_rate_limit_retry_after(
-                headers["retry-after"], retry_count, max_retries
-            )
-
-        if headers.get("x-ratelimit-remaining") == "0":
-            return self._handle_rate_limit_reset(
-                headers.get("x-ratelimit-reset"), retry_count, max_retries
-            )
-
-        if "rate limit" in body or "secondary rate limit" in body:
-            return self._handle_rate_limit_backoff(retry_count, max_retries)
-
-        raise PermissionError(status=403)
-
-    def _handle_429_error(
-        self, response: httpx.Response, retry_count: int, max_retries: int
-    ) -> Any:
-        headers = response.headers
-        if "retry-after" in headers:
-            return self._handle_rate_limit_retry_after(
-                headers["retry-after"], retry_count, max_retries
-            )
-        return self._handle_rate_limit_backoff(retry_count, max_retries)
-
-    async def _execute_request_attempt(
-        self,
-        method: str,
-        url: str,
-        params: Optional[Dict[str, Any]],
-        json_data: Optional[Dict[str, Any]],
-        retry_count: int,
-        max_retries: int,
-    ) -> Any:
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.request(
-                method, url, headers=self.headers, params=params, json=json_data
-            )
-        logger.info("github_request_completed", status_code=response.status_code)
-        await self._proactive_throttle(response)
-        return await self._handle_response(response, method, retry_count, max_retries)
-
-    def _get_error_details(self, response: httpx.Response) -> Any:
-        try:
-            return response.json()
-        except Exception:
-            return response.text
-
-    def _trigger_retry(
-        self, wait_seconds: float, retry_count: int, max_retries: int
-    ) -> Any:
-        if retry_count < max_retries:
-            raise _RetryException(wait_seconds)
-        raise RateLimitError(retry_after=wait_seconds)
-
-    def _handle_rate_limit_retry_after(
-        self, retry_after: str, retry_count: int, max_retries: int
-    ) -> Any:
-        wait_seconds = float(retry_after)
-        return self._trigger_retry(wait_seconds, retry_count, max_retries)
-
-    def _handle_rate_limit_reset(
-        self, reset: Optional[str], retry_count: int, max_retries: int
-    ) -> Any:
-        if reset:
-            wait_seconds = max(0.01, float(reset) - time.time())
-        else:
-            wait_seconds = 1.0 * (2**retry_count)
-        return self._trigger_retry(wait_seconds, retry_count, max_retries)
-
-    def _handle_rate_limit_backoff(self, retry_count: int, max_retries: int) -> Any:
-        wait_seconds = 1.0 * (2**retry_count)
-        return self._trigger_retry(wait_seconds, retry_count, max_retries)
 
     async def get_repositories(
         self, username: Optional[str] = None, org: Optional[str] = None
@@ -282,10 +267,10 @@ class GitHubClient:
     async def create_pull_request(
         self, owner: str, repo: str, data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        response_data = await self._request(
-            "POST", f"/repos/{owner}/{repo}/pulls", json_data=data
+        return cast(
+            Dict[str, Any],
+            await self._request("POST", f"/repos/{owner}/{repo}/pulls", json_data=data),
         )
-        return cast(Dict[str, Any], response_data)
 
     async def get_commits(
         self, owner: str, repo: str, sha: Optional[str] = None
