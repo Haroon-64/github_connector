@@ -38,16 +38,23 @@ def get_session_user(
         return None
 
 
-def get_current_user(
+def get_optional_user(
     request: Request,
     user: Optional[Dict[str, Any]] = Depends(get_session_user),
-) -> Dict[str, Any]:
-    """Dependency to get current authenticated user, raises 401 if not found."""
+) -> Optional[Dict[str, Any]]:
+    """Dependency to get current authenticated user, returns None if not found."""
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.replace("Bearer ", "").strip()
         return {"access_token": token, "username": "api_user"}
 
+    return user
+
+
+def get_current_user(
+    user: Optional[Dict[str, Any]] = Depends(get_optional_user),
+) -> Dict[str, Any]:
+    """Dependency to get current authenticated user, raises 401 if not found."""
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

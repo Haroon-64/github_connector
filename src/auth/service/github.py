@@ -41,7 +41,6 @@ class GitHubAuthService:
             response = await self.oauth.github.authorize_redirect(
                 request, redirect_uri, **kwargs
             )
-            logger.debug("response", response=response)
             login_url = str(response.headers.get("Location", ""))
             logger.info("login_url_generated", url=login_url)
             return login_url
@@ -55,9 +54,6 @@ class GitHubAuthService:
             user_info = await self.oauth.github.get("user", token=token)
             user_data = user_info.json()
             logger.info("oauth_callback_success", username=user_data.get("login"))
-
-            logger.debug("token", token=token, user_data=user_data, user_info=user_info)
-
             created_at = int(time.time())
 
             return {
