@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from src.app import app
-from src.dependencies.github import get_github_client
+from src.dependencies.github import get_github_client, get_optional_github_client
 from src.models.error import NotFoundError, RateLimitError, ValidationError
 
 
@@ -35,7 +35,7 @@ def test_list_repos_success(client, auth_cookie):
             "fork": False,
         }
     ]
-    app.dependency_overrides[get_github_client] = lambda: mock_client
+    app.dependency_overrides[get_optional_github_client] = lambda: mock_client
 
     try:
         response = client.get("/github/repos")
@@ -49,7 +49,7 @@ def test_list_repos_success(client, auth_cookie):
 def test_list_repos_not_found(client, auth_cookie):
     mock_client = AsyncMock()
     mock_client.get_repositories.side_effect = NotFoundError()
-    app.dependency_overrides[get_github_client] = lambda: mock_client
+    app.dependency_overrides[get_optional_github_client] = lambda: mock_client
 
     try:
         response = client.get("/github/repos?username=nonexistent")
@@ -123,7 +123,7 @@ def test_create_pull_success(client, auth_cookie):
 def test_list_commits_rate_limit(client, auth_cookie):
     mock_client = AsyncMock()
     mock_client.get_commits.side_effect = RateLimitError(retry_after=60)
-    app.dependency_overrides[get_github_client] = lambda: mock_client
+    app.dependency_overrides[get_optional_github_client] = lambda: mock_client
 
     try:
         response = client.get("/github/repos/owner/repo/commits")
