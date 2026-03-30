@@ -3,18 +3,31 @@ from typing import Any, List, Optional
 from pydantic import BaseModel
 
 
-class RepositoryResponse(BaseModel):
+class UserShort(BaseModel):
+    """Simplified GitHub user representation."""
+    login: str
     id: int
+    avatar_url: str
+    html_url: str
+    type: str
+
+
+class GitHubBaseModel(BaseModel):
+    """Base model for GitHub objects with common fields."""
+    id: int
+    url: Optional[str] = None
+    html_url: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class RepositoryResponse(GitHubBaseModel):
     name: str
     full_name: str
     private: bool
-    owner: dict[str, Any]
-    html_url: str
+    owner: UserShort
     description: Optional[str] = None
     fork: bool
-    url: Optional[str] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
     pushed_at: Optional[str] = None
 
 
@@ -25,16 +38,13 @@ class IssueRequest(BaseModel):
     labels: Optional[List[str]] = None
 
 
-class IssueResponse(BaseModel):
-    id: int
+class IssueResponse(GitHubBaseModel):
     number: int
     title: str
     state: str
-    user: dict[str, Any]
+    user: UserShort
     body: Optional[str] = None
     pull_request: Optional[dict[str, Any]] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
 
 
 class PRRequest(BaseModel):
@@ -44,23 +54,19 @@ class PRRequest(BaseModel):
     body: Optional[str] = None
 
 
-class PRResponse(BaseModel):
-    id: int
+class PRResponse(GitHubBaseModel):
     number: int
     title: str
     state: str
     body: Optional[str] = None
-    user: dict[str, Any]
+    user: UserShort
     head: dict[str, Any]
     base: dict[str, Any]
-    html_url: str
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
 
 
 class CommitResponse(BaseModel):
     sha: str
     commit: dict[str, Any]
-    author: Optional[dict[str, Any]] = None
+    author: Optional[UserShort] = None
     html_url: str
     url: Optional[str] = None
