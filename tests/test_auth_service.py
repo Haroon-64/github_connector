@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.auth.service.github import GitHubAuthError, GitHubAuthService
+from src.auth.service import GitHubAuthError, GitHubAuthService
 
 
 @pytest.mark.anyio

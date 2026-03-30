@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from src.github.client import GitHubClient
+from src.github.service import GitHubService
 from src.models.error import AuthError, NotFoundError, RateLimitError
 
 
@@ -18,7 +19,7 @@ async def test_get_repositories_success(mock_request, github_client):
     mock_response = httpx.Response(200, json=[{"name": "repo1"}])
     mock_request.return_value = mock_response
 
-    repos = await github_client.get_repositories("user")
+    repos = await GitHubService(github_client).get_repositories("user")
     assert len(repos) == 1
     assert repos[0]["name"] == "repo1"
     mock_request.assert_called_once()
@@ -34,7 +35,7 @@ async def test_pagination(mock_request, github_client):
 
     mock_request.side_effect = [page1, page2]
 
-    repos = await github_client.get_repositories()
+    repos = await GitHubService(github_client).get_repositories()
 
     assert len(repos) == 2
     assert repos[0]["name"] == "repo1"
