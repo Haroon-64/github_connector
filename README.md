@@ -85,6 +85,8 @@ The API will be available at `http://localhost:8000`.
 }
 ```
 
+- You can use /logout to log out and delete the oauth token or manually delete the user in github developer settings.
+
 ## Documentation
 
 - **Interactive API Docs**: Once running, visit [http://localhost:8000/docs](http://localhost:8000/docs) for Swagger UI.
