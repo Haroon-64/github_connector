@@ -8,13 +8,13 @@
 - dotenv - environment variables
 - httpx - http client
 - structlog - logging
-- tenacity - retry logic
 - authlib - oauth
 
 ## Endpoints
 
 GET  /auth/github/login
 GET  /auth/github/callback
+GET  /auth/logout
 
 GET  /github/users/{username}/repos
 GET  /github/orgs/{org}/repos

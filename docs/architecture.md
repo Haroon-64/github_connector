@@ -21,9 +21,10 @@ Orchestrates the OAuth2 handshake using `Authlib`.
 
 ### 3. GitHub Service Layer (`src.github`)
 
-Contains the core business logic for interacting with GitHub.
+Contains the core business logic for interacting with GitHub, separating the low-level transport from the high-level API.
 
-- **GitHub Client**: A low-level `httpx` based client that implements the "Resilient Client" pattern.
+- **GitHub Client**: A low-level `httpx` based client that implements the "Resilient Client" pattern (retries, rate-limiting, pagination).
+- **GitHub Service**: Orchestrates calls to the GitHub Client to perform specific actions (list repos, create issues, etc.).
 - **Modular Routes**: Grouped by GitHub resources (Issues, Pulls, Repos, Commits) for maintainability.
 
 ### 4. Core & Infrastructure (`src.core`)
@@ -44,5 +45,5 @@ Encapsulates service instantiation and authentication checks, making the API lay
 3. **API Request**:
     - **Cookie Auth**: User calls an endpoint $\to$ `get_session_user` retrieves data from `SESSION_CACHE`.
     - **Bearer Auth**: User provides a token $\to$ `get_optional_user` validates the token with GitHub (and `TOKEN_CACHE`) to resolve the username.
-    - **Client Init**: `GitHubClient` is initialized with the resolved token $\to$ Request is made to GitHub API.
+    - **Client/Service Init**: `GitHubClient` is initialized with the resolved token. `GitHubService` is initialized with the client $\to$ Request is made to GitHub API via the service.
 4. **Resilience**: If GitHub API returns 429 (Rate Limit) or 5xx, the client handles retries internally before returning to the route handler.

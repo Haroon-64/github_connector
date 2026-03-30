@@ -66,11 +66,11 @@ Using standard Python:
 python -m src.app
 ```
 
-The API will be available at `http://localhost:8000`.
+The API will be available at `http://127.0.0.1:8000`.
 
 ## Authentication
 
-1. Go to [http://localhost:8000/auth/github/login](http://localhost:8000/auth/github/login)
+1. Go to [http://127.0.0.1:8000/auth/github/login](http://127.0.0.1:8000/auth/github/login)
 2. Click on **Login with GitHub**
 3. Authorize the application
 4. You will be redirected to the callback URL
@@ -85,7 +85,7 @@ The API will be available at `http://localhost:8000`.
 }
 ```
 
-- You can use /logout to log out and delete the oauth token or manually delete the user in github developer settings.
+- You can use /auth/logout to log out and delete the oauth token.
 
 ## Documentation
 

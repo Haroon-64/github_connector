@@ -37,7 +37,7 @@ Uses FastAPI’s dependency system to supply authenticated context to routes.
 * **`auth.py` and `github.py`**:
   * `get_session_user`: Validates the `user_session` cookie against `SESSION_CACHE`.
   * `get_optional_user`: Handles both session-based auth and `Authorization: Bearer` headers. Bearer tokens are dynamically validated via a call to GitHub's `/user`.
-  * Provides a configured `GitHubClient` with a resolved access token to route handlers.
+  * Provides a configured `GitHubService` (backed by a `GitHubClient`) to route handlers.
 
 ## 5. GitHub Service and Client (`src/github/`)
 
@@ -46,9 +46,14 @@ Handles API communication and related concerns.
 * **`client.py` (`GitHubClient`)**:
 
   * Uses `httpx.AsyncClient` for HTTP requests.
+  * **Transport Layer**: Handles the raw communication, authentication headers, and session management.
   * **Pagination**: Detects `Link` headers and retrieves all pages automatically.
   * **Rate Limiting**: Monitors rate limit headers and delays requests when necessary.
   * **Error Mapping**: Converts HTTP errors into internal exceptions such as `NotFoundError`, `PermissionError`, and `AuthError`.
+* **`service.py` (`GitHubService`)**:
+
+  * **Business Logic Layer**: Orchestrates calls to the GitHub Client.
+  * Defines high-level methods: `get_repositories`, `get_user`, `create_issue`, `create_pull_request`, `get_commits`.
 * **`retry_policy.py` (`GitHubRetryPolicy`)**:
 
   * Determines whether failed requests should be retried.

@@ -18,9 +18,9 @@ Authorization: Bearer <TOKEN>
 * 429 Too Many Requests (rate limit)
 * 500 GitHub internal error
 
-### Callback
+### OAuth Token
 
-the callback on oauth by default dont expire
+GitHub OAuth tokens do not expire by default.
 
 ```json
 "token": {
