@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from src.dependencies.github import github_provider
 from src.github.service import GitHubService
-from src.models.error import AuthError, NotFoundError, RateLimitError, ValidationError
 from src.models.github import IssueRequest, IssueResponse
 
 router = APIRouter()
@@ -20,22 +19,7 @@ async def create_issue(
     service: GitHubService = Depends(github_provider(required=True)),
 ) -> Any:
     logger.debug("create_issue_request", owner=owner, repo=repo)
-    try:
-        return await service.create_issue(owner, repo, issue.model_dump())
-    except AuthError as e:
-        raise HTTPException(status_code=e.status, detail="Authentication failed")
-    except NotFoundError:
-        raise HTTPException(status_code=404, detail="Repository or issue not found")
-    except RateLimitError as e:
-        raise HTTPException(
-            status_code=403,
-            detail="Rate limit exceeded",
-            headers={"Retry-After": str(e.retry_after)} if e.retry_after else None,
-        )
-    except ValidationError as e:
-        raise HTTPException(status_code=e.status, detail=str(e.details))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return await service.create_issue(owner, repo, issue.model_dump())
 
 
 @router.get("/repos/{owner}/{repo}/issues", response_model=List[IssueResponse])
@@ -45,17 +29,4 @@ async def list_issues(
     service: GitHubService = Depends(github_provider(required=False)),
 ) -> Any:
     logger.debug("list_issues_request", owner=owner, repo=repo)
-    try:
-        return await service.list_issues(owner, repo)
-    except AuthError as e:
-        raise HTTPException(status_code=e.status, detail="Authentication failed")
-    except NotFoundError:
-        raise HTTPException(status_code=404, detail="Repository not found")
-    except RateLimitError as e:
-        raise HTTPException(
-            status_code=403,
-            detail="Rate limit exceeded",
-            headers={"Retry-After": str(e.retry_after)} if e.retry_after else None,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return await service.list_issues(owner, repo)

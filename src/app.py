@@ -27,12 +27,37 @@ app.include_router(github_router, prefix="/github")
 
 @app.exception_handler(ApiError)
 async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
+    headers = {}
+    if hasattr(exc, "retry_after") and exc.retry_after:
+        headers["Retry-After"] = str(exc.retry_after)
+
     content = ErrorResponse(
         type=exc.type, status=exc.status, details=exc.details
     ).model_dump()
+
+    if isinstance(exc.details, str):
+        content["detail"] = exc.details
+    elif exc.type == "rate_limit":
+        content["detail"] = "Rate limit exceeded"
+    elif exc.type == "not_found":
+        content["detail"] = "Not found"
+    elif exc.type == "auth":
+        content["detail"] = "Authentication failed"
+    else:
+        content["detail"] = f"{exc.type.capitalize()} error occurred"
+
+    logger.error(
+        "api_error",
+        type=exc.type,
+        status=exc.status,
+        details=exc.details,
+        path=request.url.path,
+    )
+
     return JSONResponse(
         status_code=exc.status,
         content=content,
+        headers=headers,
     )
 
 

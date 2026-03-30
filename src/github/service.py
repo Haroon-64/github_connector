@@ -13,49 +13,79 @@ class GitHubService:
     def __init__(self, client: GitHubClient):
         self.client = client
 
+    async def _request(
+        self,
+        method: str,
+        endpoint: str,
+        operation: str,
+        params: Optional[Dict[str, Any]] = None,
+        json_data: Optional[Dict[str, Any]] = None,
+        **log_kwargs: Any,
+    ) -> Any:
+        """Centralized request helper with logging."""
+        logger.debug(f"github_service_{operation}", endpoint=endpoint, **log_kwargs)
+        return await self.client.request(
+            method, endpoint, params=params, json_data=json_data
+        )
+
     async def get_repositories(
         self, username: Optional[str] = None, org: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Fetch repositories for a user, organization, or the current user."""
-        logger.debug("fetching_repositories", username=username, org=org)
         if username:
             endpoint = f"/users/{username}/repos"
         elif org:
             endpoint = f"/orgs/{org}/repos"
         else:
             endpoint = "/user/repos"
-        return cast(List[Dict[str, Any]], await self.client.request("GET", endpoint))
+        return cast(
+            List[Dict[str, Any]],
+            await self._request(
+                "GET", endpoint, "get_repositories", username=username, org=org
+            ),
+        )
 
     async def get_user(self) -> Dict[str, Any]:
         """Fetch current user information."""
-        logger.debug("fetching_current_user")
-        return cast(Dict[str, Any], await self.client.request("GET", "/user"))
+        return cast(
+            Dict[str, Any], await self._request("GET", "/user", "get_current_user")
+        )
 
     async def get_repository(self, owner: str, repo: str) -> Dict[str, Any]:
         """Fetch single repository information."""
-        logger.debug("fetching_repository", owner=owner, repo=repo)
         return cast(
             Dict[str, Any],
-            await self.client.request("GET", f"/repos/{owner}/{repo}"),
+            await self._request(
+                "GET", f"/repos/{owner}/{repo}", "get_repository", owner=owner, repo=repo
+            ),
         )
 
     async def list_issues(self, owner: str, repo: str) -> List[Dict[str, Any]]:
         """List issues for a repository."""
-        logger.debug("listing_issues", owner=owner, repo=repo)
         return cast(
             List[Dict[str, Any]],
-            await self.client.request("GET", f"/repos/{owner}/{repo}/issues"),
+            await self._request(
+                "GET",
+                f"/repos/{owner}/{repo}/issues",
+                "list_issues",
+                owner=owner,
+                repo=repo,
+            ),
         )
 
     async def create_issue(
         self, owner: str, repo: str, data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Create an issue in a repository."""
-        logger.debug("creating_issue", owner=owner, repo=repo)
         return cast(
             Dict[str, Any],
-            await self.client.request(
-                "POST", f"/repos/{owner}/{repo}/issues", json_data=data
+            await self._request(
+                "POST",
+                f"/repos/{owner}/{repo}/issues",
+                "create_issue",
+                owner=owner,
+                repo=repo,
+                json_data=data,
             ),
         )
 
@@ -63,11 +93,15 @@ class GitHubService:
         self, owner: str, repo: str, data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Create a pull request in a repository."""
-        logger.debug("creating_pull_request", owner=owner, repo=repo)
         return cast(
             Dict[str, Any],
-            await self.client.request(
-                "POST", f"/repos/{owner}/{repo}/pulls", json_data=data
+            await self._request(
+                "POST",
+                f"/repos/{owner}/{repo}/pulls",
+                "create_pull_request",
+                owner=owner,
+                repo=repo,
+                json_data=data,
             ),
         )
 
@@ -75,11 +109,16 @@ class GitHubService:
         self, owner: str, repo: str, sha: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Fetch commits from a repository, optionally filtered by SHA."""
-        logger.debug("fetching_commits", owner=owner, repo=repo, sha=sha)
         params = {"sha": sha} if sha else {}
         return cast(
             List[Dict[str, Any]],
-            await self.client.request(
-                "GET", f"/repos/{owner}/{repo}/commits", params=params
+            await self._request(
+                "GET",
+                f"/repos/{owner}/{repo}/commits",
+                "get_commits",
+                owner=owner,
+                repo=repo,
+                sha=sha,
+                params=params,
             ),
         )

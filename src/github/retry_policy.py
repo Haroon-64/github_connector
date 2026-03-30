@@ -8,10 +8,7 @@ import httpx
 import structlog
 
 from src.models.error import (
-    NetworkError,
     RateLimitError,
-    ServerError,
-    TimeoutError,
 )
 
 logger = structlog.get_logger(__name__)
@@ -66,9 +63,7 @@ class GitHubRetryPolicy:
 
             if wait_time > 600:  # 10 minutes
                 logger.warning("rate_limit_wait_too_long", wait=wait_time)
-                raise RateLimitError(
-                    detail=f"Rate limit exceeded. Wait {int(wait_time)}s is too long."
-                )
+                raise RateLimitError()
 
             return RetryDecision(RetryType.RATE_LIMIT, min(wait_time, self.max_time))
 
@@ -95,18 +90,17 @@ class GitHubRetryPolicy:
         wait_time += random.uniform(0, 1)
         return RetryDecision(RetryType.NETWORK, wait_time)
 
-    def check_stop_limits(
+    def should_stop(
         self,
         decision: RetryDecision,
         attempt_counts: Dict[RetryType, int],
         start_time: float,
-    ) -> None:
+    ) -> bool:
         """Check both absolute max_time and exact attempt counts per type.
 
-        Raises error if stop limit hit.
+        Returns True if stop limit hit.
         """
         elapsed_time = time.time() - start_time
-        hit = False
         if elapsed_time > self.max_time:
             logger.error(
                 "github_retry_timeout_exceeded",
@@ -115,7 +109,7 @@ class GitHubRetryPolicy:
                 total_attempts=attempt_counts[decision.retry_type],
                 elapsed_time=elapsed_time,
             )
-            hit = True
+            return True
 
         limit = (
             self.max_rate_limit_retries
@@ -130,13 +124,6 @@ class GitHubRetryPolicy:
                 total_attempts=attempt_counts[decision.retry_type],
                 elapsed_time=elapsed_time,
             )
-            hit = True
+            return True
 
-        if hit:
-            if decision.retry_type == RetryType.RATE_LIMIT:
-                raise RateLimitError()
-            if decision.retry_type == RetryType.SERVER:
-                raise ServerError()
-            if decision.retry_type == RetryType.TIMEOUT:
-                raise TimeoutError()
-            raise NetworkError()
+        return False

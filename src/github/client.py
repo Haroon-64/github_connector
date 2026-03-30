@@ -12,11 +12,13 @@ from src.github.retry_policy import GitHubRetryPolicy, RetryType
 from src.models.error import (
     AuthError,
     ConflictError,
+    NetworkError,
     NotFoundError,
     PermissionError,
     RateLimitError,
     RedirectError,
     ServerError,
+    TimeoutError,
     ValidationError,
 )
 
@@ -97,6 +99,11 @@ class GitHubClient:
             return response.text
 
     async def _throttle_and_pace(self) -> None:
+        """Proactively delays requests based on stored rate limit state (pacing).
+
+        This is different from the retry policy, which reactively handles
+        rate limit errors (403/429) after they occur.
+        """
         state = RATE_LIMIT_STATE.get(self._access_token)
         if not state:
             return
@@ -118,9 +125,7 @@ class GitHubClient:
             # Short-circuit if wait is too long
             if wait_time > 600:
                 logger.warning("pacing_wait_too_long", wait=wait_time)
-                raise RateLimitError(
-                    detail=f"Rate limit pacing requires {int(wait_time)}s wait."
-                )
+                raise RateLimitError()
 
             logger.debug("github_request_pacing_or_throttle", wait=wait_time)
             await asyncio.sleep(wait_time)
@@ -168,7 +173,8 @@ class GitHubClient:
                 return self._finalize_response(response, method)
 
             attempt_counts[decision.retry_type] += 1
-            self.retry_policy.check_stop_limits(decision, attempt_counts, start_time)
+            if self.retry_policy.should_stop(decision, attempt_counts, start_time):
+                self._handle_retry_failure(decision)
 
             logger.warning(
                 "github_request_retry",
@@ -176,8 +182,17 @@ class GitHubClient:
                 retry_type=decision.retry_type.name,
                 attempt=attempt_counts[decision.retry_type],
             )
-
             await asyncio.sleep(decision.wait)
+
+    def _handle_retry_failure(self, decision: Any) -> None:
+        """Raises the appropriate exception when retry limits are hit."""
+        if decision.retry_type == RetryType.RATE_LIMIT:
+            raise RateLimitError()
+        if decision.retry_type == RetryType.SERVER:
+            raise ServerError()
+        if decision.retry_type == RetryType.TIMEOUT:
+            raise TimeoutError()
+        raise NetworkError()
 
     def _finalize_response(self, response: httpx.Response, method: str) -> Any:
         status = response.status_code
