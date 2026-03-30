@@ -42,8 +42,8 @@ A FastAPI-based application designed to interface with the GitHub API. It featur
     1. Go to [https://github.com/settings/applications/new](https://github.com/settings/applications/new)
     2. Fill in the following fields:
           - **Application name**: GitHub Connector
-          - **Homepage URL**: <http://localhost:8000>
-          - **Authorization callback URL**: <http://localhost:8000/auth/github/callback>
+          - **Homepage URL**: <http://127.0.0.1:8000>
+          - **Authorization callback URL**: <http://127.0.0.1:8000/auth/github/callback>
     3. Click on **Register application**
     4. Copy the **Client ID** and **Client Secret**
     5. Paste them in the `.env` file
