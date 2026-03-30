@@ -68,6 +68,23 @@ python -m src.app
 
 The API will be available at `http://localhost:8000`.
 
+## Authentication
+
+1. Go to [http://localhost:8000/auth/github/login](http://localhost:8000/auth/github/login)
+2. Click on **Login with GitHub**
+3. Authorize the application
+4. You will be redirected to the callback URL
+5. You will see the following response:
+
+```json
+{
+  "access_token": "<ACCESS_TOKEN>",
+  "token_type": "bearer",
+  "username": "<USERNAME>",
+  "created_at": "<CREATED_AT>"
+}
+```
+
 ## Documentation
 
 - **Interactive API Docs**: Once running, visit [http://localhost:8000/docs](http://localhost:8000/docs) for Swagger UI.
