@@ -6,9 +6,9 @@ The `github_connector` is a FastAPI application that interfaces with the GitHub 
 
 The application is initialized in `src/app.py` using FastAPI.
 
-* **Middleware**: Adds `SessionMiddleware` configured with `OAUTH_SECRET`. A separate `user_session` cookie is used for primary state handling.
-* **Routers**: Registers two routers: `auth_router` for authentication and `github_router` for GitHub operations.
-* **Error Handling**: A global handler for `ApiError` converts internal exceptions (e.g., `NotFoundError`, `RateLimitError`) into structured JSON responses with appropriate HTTP status codes.
+* **Middleware**: Includes `SessionMiddleware` specifically for **Authlib's internal OAuth state management** (e.g., storing the `state` parameter to prevent CSRF during the login handshake). It is intentionally **not** used for persisting user session data; that is handled manually via `session_id` and `SESSION_CACHE`.
+* **Routers**: Registers `auth_router` and `github_router`.
+* **Error Handling**: Converts internal exceptions into structured JSON responses.
 
 ## 2. Core Configuration (`src/core/`)
 
@@ -26,15 +26,18 @@ Authentication is implemented with `Authlib` and maintains minimal server-side s
   * `handle_callback`: Exchanges the authorization code for an access token and retrieves user data.
   * `revoke_token`: Sends a request to invalidate the OAuth token.
 * **`routes.py`**:
-
   * Login endpoint returns the authorization URL.
-  * Callback endpoint processes the OAuth response and stores user data and token in an HTTP-only `user_session` cookie.
+  * Callback endpoint processes the OAuth response, generates a secure `session_id`, and stores the user data in `SESSION_CACHE`. It sets an HTTP-only, secure `user_session` cookie containing the ID.
+  * Logout endpoint revokes the token with GitHub and deletes the session from `SESSION_CACHE`.
 
 ## 4. Dependency Injection Layer (`src/dependencies/`)
 
 Uses FastAPI’s dependency system to supply authenticated context to routes.
 
-* **`auth.py` and `github.py`**: Read and validate the `user_session` cookie, then provide a configured `GitHubClient` or user object to route handlers.
+* **`auth.py` and `github.py`**:
+  * `get_session_user`: Validates the `user_session` cookie against `SESSION_CACHE`.
+  * `get_optional_user`: Handles both session-based auth and `Authorization: Bearer` headers. Bearer tokens are dynamically validated via a call to GitHub's `/user`.
+  * Provides a configured `GitHubClient` with a resolved access token to route handlers.
 
 ## 5. GitHub Service and Client (`src/github/`)
 

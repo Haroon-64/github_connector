@@ -2,7 +2,7 @@ from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.dependencies.github import get_github_client
+from src.dependencies.github import get_optional_github_client
 from src.github.client import GitHubClient
 from src.models.error import (
     AuthError,
@@ -19,7 +19,7 @@ router = APIRouter()
 async def list_repos(
     username: Optional[str] = Query(None),
     org: Optional[str] = Query(None),
-    client: GitHubClient = Depends(get_github_client),
+    client: GitHubClient = Depends(get_optional_github_client),
 ) -> Any:
     try:
         return await client.get_repositories(username=username, org=org)
@@ -42,7 +42,7 @@ async def list_repos(
 @router.get("/repos/{owner}", response_model=List[RepositoryResponse])
 async def list_user_repos(
     owner: str,
-    client: GitHubClient = Depends(get_github_client),
+    client: GitHubClient = Depends(get_optional_github_client),
 ) -> Any:
     try:
         return await client.get_repositories(username=owner)
@@ -56,7 +56,7 @@ async def list_user_repos(
 async def get_repo(
     owner: str,
     repo: str,
-    client: GitHubClient = Depends(get_github_client),
+    client: GitHubClient = Depends(get_optional_github_client),
 ) -> Any:
     try:
         return await client.get_repository(owner, repo)

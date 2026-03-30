@@ -26,13 +26,14 @@ logger = structlog.get_logger(__name__)
 
 
 class GitHubClient:
-    def __init__(self, access_token: str):
+    def __init__(self, access_token: Optional[str] = None):
         self.base_url = settings.GITHUB_API_URL
         self.headers = {
-            "Authorization": f"Bearer {access_token}",
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
+        if access_token:
+            self.headers["Authorization"] = f"Bearer {access_token}"
         self.timeout = 10.0
         self._client: Optional[httpx.AsyncClient] = None
         self._rate_limit_remaining: Optional[int] = None

@@ -2,7 +2,7 @@ from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.dependencies.github import get_github_client
+from src.dependencies.github import get_optional_github_client
 from src.github.client import GitHubClient
 from src.models.error import AuthError, NotFoundError, RateLimitError
 from src.models.github import CommitResponse
@@ -15,7 +15,7 @@ async def list_commits(
     owner: str,
     repo: str,
     sha: Optional[str] = Query(None),
-    client: GitHubClient = Depends(get_github_client),
+    client: GitHubClient = Depends(get_optional_github_client),
 ) -> Any:
     try:
         return await client.get_commits(owner, repo, sha=sha)

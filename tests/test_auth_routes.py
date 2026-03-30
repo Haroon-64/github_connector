@@ -1,10 +1,10 @@
-import json
+import secrets
 import time
 from unittest.mock import AsyncMock
 
-import pytest
 from src.app import app
 from src.auth.service.github import GitHubAuthError
+from src.core.session import SESSION_CACHE
 from src.dependencies.auth import get_auth_service
 
 
@@ -30,7 +30,6 @@ def test_github_callback_route_success(client):
         "username": "testuser",
         "access_token": "token123",
         "token_type": "bearer",
-        "expires_in": 3600,
         "created_at": now,
     }
     mock_service = AsyncMock()
@@ -48,6 +47,8 @@ def test_github_callback_route_success(client):
         assert data["created_at"] == now
 
         # Check if cookie is set by hitting /auth/me
+        session_cookie = response.cookies.get("user_session")
+        client.cookies.set("user_session", session_cookie)
         me_response = client.get("/auth/me")
         assert me_response.status_code == 200
         me_data = me_response.json()
@@ -82,11 +83,12 @@ def test_me_route_authenticated(client):
         "username": "testuser",
         "access_token": "token123",
         "created_at": now,
-        "expires_at": now + 3600,
     }
-    cookie_value = json.dumps(user_data)
 
-    client.cookies.set("user_session", cookie_value)
+    session_id = secrets.token_urlsafe(32)
+    SESSION_CACHE[session_id] = user_data
+
+    client.cookies.set("user_session", session_id)
     response = client.get("/auth/me")
 
     assert response.status_code == 200
