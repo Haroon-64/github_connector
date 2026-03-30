@@ -2,8 +2,8 @@ from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.dependencies.github import get_optional_github_client
-from src.github.client import GitHubClient
+from src.dependencies.github import get_optional_github_service
+from src.github.service import GitHubService
 from src.models.error import AuthError, NotFoundError, RateLimitError
 from src.models.github import CommitResponse
 
@@ -15,10 +15,10 @@ async def list_commits(
     owner: str,
     repo: str,
     sha: Optional[str] = Query(None),
-    client: GitHubClient = Depends(get_optional_github_client),
+    service: GitHubService = Depends(get_optional_github_service),
 ) -> Any:
     try:
-        return await client.get_commits(owner, repo, sha=sha)
+        return await service.get_commits(owner, repo, sha=sha)
     except AuthError as e:
         raise HTTPException(status_code=e.status, detail="Authentication failed")
     except NotFoundError:

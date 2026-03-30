@@ -2,8 +2,8 @@ from typing import Any, List
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from src.dependencies.github import get_github_client, get_optional_github_client
-from src.github.client import GitHubClient
+from src.dependencies.github import get_github_service, get_optional_github_service
+from src.github.service import GitHubService
 from src.models.error import AuthError, NotFoundError, RateLimitError, ValidationError
 from src.models.github import IssueRequest, IssueResponse
 
@@ -15,10 +15,10 @@ async def create_issue(
     owner: str,
     repo: str,
     issue: IssueRequest,
-    client: GitHubClient = Depends(get_github_client),
+    service: GitHubService = Depends(get_github_service),
 ) -> Any:
     try:
-        return await client.create_issue(owner, repo, issue.model_dump())
+        return await service.create_issue(owner, repo, issue.model_dump())
     except AuthError as e:
         raise HTTPException(status_code=e.status, detail="Authentication failed")
     except NotFoundError:
@@ -37,10 +37,10 @@ async def create_issue(
 
 @router.get("/repos/{owner}/{repo}/issues", response_model=List[IssueResponse])
 async def list_issues(
-    owner: str, repo: str, client: GitHubClient = Depends(get_optional_github_client)
+    owner: str, repo: str, service: GitHubService = Depends(get_optional_github_service)
 ) -> Any:
     try:
-        return await client.list_issues(owner, repo)
+        return await service.list_issues(owner, repo)
     except AuthError as e:
         raise HTTPException(status_code=e.status, detail="Authentication failed")
     except NotFoundError:

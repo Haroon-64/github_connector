@@ -2,8 +2,8 @@ from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.dependencies.github import get_optional_github_client
-from src.github.client import GitHubClient
+from src.dependencies.github import get_optional_github_service
+from src.github.service import GitHubService
 from src.models.error import (
     AuthError,
     NotFoundError,
@@ -23,10 +23,10 @@ router = APIRouter()
 async def list_repos(
     username: Optional[str] = Query(None),
     org: Optional[str] = Query(None),
-    client: GitHubClient = Depends(get_optional_github_client),
+    service: GitHubService = Depends(get_optional_github_service),
 ) -> Any:
     try:
-        return await client.get_repositories(username=username, org=org)
+        return await service.get_repositories(username=username, org=org)
     except AuthError as e:
         raise HTTPException(status_code=e.status, detail="Authentication failed")
     except NotFoundError:
@@ -48,10 +48,10 @@ async def list_repos(
 async def get_repo(
     owner: str,
     repo: str,
-    client: GitHubClient = Depends(get_optional_github_client),
+    service: GitHubService = Depends(get_optional_github_service),
 ) -> Any:
     try:
-        return await client.get_repository(owner, repo)
+        return await service.get_repository(owner, repo)
     except Exception as e:
         if hasattr(e, "status"):
             raise

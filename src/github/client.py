@@ -2,7 +2,7 @@ import asyncio
 import random
 import re
 import time
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, Optional
 
 import httpx
 import structlog
@@ -30,7 +30,7 @@ class GitHubClient:
         self.base_url = settings.GITHUB_API_URL
         self.headers = {
             "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
+            "X-GitHub-Api-Version": "2026-03-10",
         }
         if access_token:
             self.headers["Authorization"] = f"Bearer {access_token}"
@@ -94,7 +94,7 @@ class GitHubClient:
         if reset is not None:
             self._rate_limit_reset = float(reset)
 
-    async def _request(
+    async def request(
         self,
         method: str,
         endpoint: str,
@@ -228,56 +228,3 @@ class GitHubClient:
                 status=status, details=self._get_error_details(response)
             )
         raise ServerError()
-
-    async def get_repositories(
-        self, username: Optional[str] = None, org: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        if username:
-            endpoint = f"/users/{username}/repos"
-        elif org:
-            endpoint = f"/orgs/{org}/repos"
-        else:
-            endpoint = "/user/repos"
-        return cast(List[Dict[str, Any]], await self._request("GET", endpoint))
-
-    async def get_user(self) -> Dict[str, Any]:
-        return cast(Dict[str, Any], await self._request("GET", "/user"))
-
-    async def get_repository(self, owner: str, repo: str) -> Dict[str, Any]:
-        return cast(
-            Dict[str, Any],
-            await self._request("GET", f"/repos/{owner}/{repo}"),
-        )
-
-    async def list_issues(self, owner: str, repo: str) -> List[Dict[str, Any]]:
-        return cast(
-            List[Dict[str, Any]],
-            await self._request("GET", f"/repos/{owner}/{repo}/issues"),
-        )
-
-    async def create_issue(
-        self, owner: str, repo: str, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        return cast(
-            Dict[str, Any],
-            await self._request(
-                "POST", f"/repos/{owner}/{repo}/issues", json_data=data
-            ),
-        )
-
-    async def create_pull_request(
-        self, owner: str, repo: str, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        return cast(
-            Dict[str, Any],
-            await self._request("POST", f"/repos/{owner}/{repo}/pulls", json_data=data),
-        )
-
-    async def get_commits(
-        self, owner: str, repo: str, sha: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        params = {"sha": sha} if sha else {}
-        return cast(
-            List[Dict[str, Any]],
-            await self._request("GET", f"/repos/{owner}/{repo}/commits", params=params),
-        )
