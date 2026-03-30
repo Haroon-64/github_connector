@@ -37,14 +37,14 @@ class IssueResponse(BaseModel):
     updated_at: Optional[str] = None
 
 
-class PullRequestRequest(BaseModel):
+class PRRequest(BaseModel):
     title: str
     head: str
     base: str
     body: Optional[str] = None
 
 
-class PullRequestResponse(BaseModel):
+class PRResponse(BaseModel):
     id: int
     number: int
     title: str

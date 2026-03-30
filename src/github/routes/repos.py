@@ -1,8 +1,9 @@
+import structlog
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.dependencies.github import get_optional_github_service
+from src.dependencies.github import github_provider
 from src.github.service import GitHubService
 from src.models.error import (
     AuthError,
@@ -13,6 +14,7 @@ from src.models.error import (
 from src.models.github import RepositoryResponse
 
 router = APIRouter()
+logger = structlog.get_logger(__name__)
 
 
 @router.get(
@@ -23,8 +25,9 @@ router = APIRouter()
 async def list_repos(
     username: Optional[str] = Query(None),
     org: Optional[str] = Query(None),
-    service: GitHubService = Depends(get_optional_github_service),
+    service: GitHubService = Depends(github_provider(required=False)),
 ) -> Any:
+    logger.debug("list_repos_request", username=username, org=org)
     try:
         return await service.get_repositories(username=username, org=org)
     except AuthError as e:
@@ -40,6 +43,7 @@ async def list_repos(
     except ValidationError as e:
         raise HTTPException(status_code=e.status, detail=str(e.details))
     except Exception as e:
+        logger.error("list_repos_failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -48,11 +52,13 @@ async def list_repos(
 async def get_repo(
     owner: str,
     repo: str,
-    service: GitHubService = Depends(get_optional_github_service),
+    service: GitHubService = Depends(github_provider(required=False)),
 ) -> Any:
+    logger.debug("get_repo_request", owner=owner, repo=repo)
     try:
         return await service.get_repository(owner, repo)
     except Exception as e:
+        logger.error("get_repo_failed", owner=owner, repo=repo, error=str(e))
         if hasattr(e, "status"):
             raise
         raise HTTPException(status_code=500, detail=str(e))

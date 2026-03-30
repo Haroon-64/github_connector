@@ -85,24 +85,26 @@ def setup_logging() -> structlog.BoundLogger:
 
     # Configure root logger
     root_logger = logging.getLogger()
-    if root_logger.handlers:
-        for h in root_logger.handlers[:]:
-            root_logger.removeHandler(h)
-
+    for h in root_logger.handlers[:]:
+        root_logger.removeHandler(h)
     root_logger.addHandler(handler)
 
-    # Use log level from settings, defaulting to INFO if invalid
     log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
     root_logger.setLevel(log_level)
 
-    # Silence noisy loggers in debug mode
+    # Configure specific loggers to use our handler and levels
     for logger_name in [
+        "uvicorn",
+        "uvicorn.error",
+        "uvicorn.access",
         "httpx",
         "httpcore",
         "authlib",
-        "uvicorn.access",
         "anyio",
     ]:
-        logging.getLogger(logger_name).setLevel(logging.ERROR)
+        logger_obj = logging.getLogger(logger_name)
+        logger_obj.handlers = []
+        logger_obj.propagate = True
+        logger_obj.setLevel(logging.ERROR)
 
     return cast(structlog.BoundLogger, structlog.get_logger("github_connector"))

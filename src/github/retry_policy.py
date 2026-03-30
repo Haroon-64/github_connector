@@ -7,6 +7,13 @@ from typing import Any, Dict, Optional, cast
 import httpx
 import structlog
 
+from src.models.error import (
+    NetworkError,
+    RateLimitError,
+    ServerError,
+    TimeoutError,
+)
+
 logger = structlog.get_logger(__name__)
 
 
@@ -43,21 +50,27 @@ class GitHubRetryPolicy:
         status = response.status_code
         if status in (403, 429):
             headers = response.headers
+            wait_time = 0.0
+
             if "retry-after" in headers:
-                return RetryDecision(
-                    RetryType.RATE_LIMIT, float(cast(Any, headers["retry-after"]))
-                )
-            if status == 403 and headers.get("x-ratelimit-remaining") == "0":
+                wait_time = float(cast(Any, headers["retry-after"]))
+            elif status == 403 and headers.get("x-ratelimit-remaining") == "0":
                 reset = headers.get("x-ratelimit-reset")
                 if reset:
-                    val = max(0.01, float(reset) - time.time())
-                    val += random.uniform(0, 1)
-                    return RetryDecision(RetryType.RATE_LIMIT, min(val, self.max_time))
+                    wait_time = max(0.01, float(reset) - time.time())
+                    wait_time += random.uniform(0, 1)
+            else:
+                attempt = attempt_counts[RetryType.RATE_LIMIT]
+                wait_time = min(15.0 * (2**attempt), 60.0)
+                wait_time += random.uniform(0, 1)
 
-            attempt = attempt_counts[RetryType.RATE_LIMIT]
-            wait_time = min(15.0 * (2**attempt), 60.0)
-            wait_time += random.uniform(0, 1)
-            return RetryDecision(RetryType.RATE_LIMIT, wait_time)
+            if wait_time > 600:  # 10 minutes
+                logger.warning("rate_limit_wait_too_long", wait=wait_time)
+                raise RateLimitError(
+                    detail=f"Rate limit exceeded. Wait {int(wait_time)}s is too long."
+                )
+
+            return RetryDecision(RetryType.RATE_LIMIT, min(wait_time, self.max_time))
 
         if status >= 500:
             attempt = attempt_counts[RetryType.SERVER]
@@ -82,14 +95,18 @@ class GitHubRetryPolicy:
         wait_time += random.uniform(0, 1)
         return RetryDecision(RetryType.NETWORK, wait_time)
 
-    def should_stop(
+    def check_stop_limits(
         self,
         decision: RetryDecision,
         attempt_counts: Dict[RetryType, int],
         start_time: float,
-    ) -> bool:
-        """Check both absolute max_time and exact attempt counts per type."""
+    ) -> None:
+        """Check both absolute max_time and exact attempt counts per type.
+
+        Raises error if stop limit hit.
+        """
         elapsed_time = time.time() - start_time
+        hit = False
         if elapsed_time > self.max_time:
             logger.error(
                 "github_retry_timeout_exceeded",
@@ -98,7 +115,7 @@ class GitHubRetryPolicy:
                 total_attempts=attempt_counts[decision.retry_type],
                 elapsed_time=elapsed_time,
             )
-            return True
+            hit = True
 
         limit = (
             self.max_rate_limit_retries
@@ -113,6 +130,13 @@ class GitHubRetryPolicy:
                 total_attempts=attempt_counts[decision.retry_type],
                 elapsed_time=elapsed_time,
             )
-            return True
+            hit = True
 
-        return False
+        if hit:
+            if decision.retry_type == RetryType.RATE_LIMIT:
+                raise RateLimitError()
+            if decision.retry_type == RetryType.SERVER:
+                raise ServerError()
+            if decision.retry_type == RetryType.TIMEOUT:
+                raise TimeoutError()
+            raise NetworkError()

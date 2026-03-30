@@ -1,37 +1,28 @@
-from typing import Any, Optional
+from typing import Any, Callable, Dict, Optional
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException, status
 
-from src.dependencies.auth import get_current_user, get_optional_user
+from src.dependencies.auth import get_optional_user
 from src.github.client import GitHubClient
 from src.github.service import GitHubService
 
 
-def get_github_client(
-    current_user: dict[str, Any] = Depends(get_current_user),
-) -> GitHubClient:
-    """Dependency to provide a GitHubClient
-    instance for the current authenticated user."""
-    return GitHubClient(current_user["access_token"])
+def github_provider(required: bool = True) -> Callable[..., Any]:
+    """
+    Unified dependency provider for GitHub services.
+    Handles both authenticated (required=True) and public (required=False) access.
+    """
 
+    def _get_github(
+        user: Optional[Dict[str, Any]] = Depends(get_optional_user),
+    ) -> GitHubService:
+        if required and not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required or session expired",
+            )
 
-def get_optional_github_client(
-    current_user: Optional[dict[str, Any]] = Depends(get_optional_user),
-) -> GitHubClient:
-    """Dependency to provide a GitHubClient instance, optionally authenticated."""
-    token = current_user["access_token"] if current_user else None
-    return GitHubClient(token)
+        token = user["access_token"] if user else None
+        return GitHubService(GitHubClient(token))
 
-
-def get_github_service(
-    client: GitHubClient = Depends(get_github_client),
-) -> GitHubService:
-    """Dependency to provide a GitHubService instance."""
-    return GitHubService(client)
-
-
-def get_optional_github_service(
-    client: GitHubClient = Depends(get_optional_github_client),
-) -> GitHubService:
-    """Dependency to provide a GitHubService instance, optionally authenticated."""
-    return GitHubService(client)
+    return _get_github

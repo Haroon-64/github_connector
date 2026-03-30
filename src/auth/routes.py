@@ -1,6 +1,7 @@
 import secrets
 from typing import Any, Optional
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from src.auth.service import GitHubAuthError, GitHubAuthService
@@ -15,6 +16,7 @@ from src.dependencies.auth import (
 from src.models.auth import CallbackResponse, LoginResponse, UserResponse
 
 auth_router = APIRouter()
+logger = structlog.get_logger(__name__)
 
 
 @auth_router.get("/github/login", response_model=LoginResponse)
@@ -30,6 +32,7 @@ async def github_login(
     auth_service: GitHubAuthService = Depends(get_auth_service),
 ) -> LoginResponse:
     """Initiate GitHub OAuth login flow."""
+    logger.debug("github_login_start", scope=scope)
     try:
         login_url = await auth_service.get_login_url(
             request,
@@ -50,6 +53,7 @@ async def github_callback(
     auth_service: GitHubAuthService = Depends(get_auth_service),
 ) -> CallbackResponse:
     """Handle GitHub OAuth callback and retrieve access token."""
+    logger.debug("github_callback_received")
     try:
         result = await auth_service.handle_callback(request)
 
@@ -72,7 +76,6 @@ async def github_callback(
         )
 
         return CallbackResponse(
-            access_token=result["access_token"],
             token_type=result["token_type"],
             username=result["username"],
             created_at=result["created_at"],
@@ -89,6 +92,7 @@ async def logout(
     auth_service: GitHubAuthService = Depends(get_auth_service),
 ) -> Any:
     """Log out the user by clearing the session cookie and revoking the token."""
+    logger.debug("logout_requested", username=user.get("username") if user else None)
     if user and user.get("access_token"):
         await auth_service.revoke_token(user["access_token"])
 
@@ -105,4 +109,5 @@ async def get_me(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> UserResponse:
     """Get currently authenticated user info."""
+    logger.debug("get_me_requested", username=current_user.get("username"))
     return UserResponse(**current_user)

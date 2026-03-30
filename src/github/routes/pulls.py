@@ -1,22 +1,25 @@
 from typing import Any
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 
-from src.dependencies.github import get_github_service
+from src.dependencies.github import github_provider
 from src.github.service import GitHubService
 from src.models.error import AuthError, NotFoundError, RateLimitError, ValidationError
-from src.models.github import PullRequestRequest, PullRequestResponse
+from src.models.github import PRRequest, PRResponse
 
 router = APIRouter()
+logger = structlog.get_logger(__name__)
 
 
-@router.post("/repos/{owner}/{repo}/pulls", response_model=PullRequestResponse)
+@router.post("/repos/{owner}/{repo}/pulls", response_model=PRResponse)
 async def create_pull(
     owner: str,
     repo: str,
-    pull: PullRequestRequest,
-    service: GitHubService = Depends(get_github_service),
+    pull: PRRequest,
+    service: GitHubService = Depends(github_provider(required=True)),
 ) -> Any:
+    logger.debug("create_pull_request", owner=owner, repo=repo)
     try:
         return await service.create_pull_request(owner, repo, pull.model_dump())
     except AuthError as e:

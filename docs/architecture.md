@@ -43,7 +43,7 @@ Encapsulates service instantiation and authentication checks, making the API lay
 1. **User Login**: User initiates login $\to$ Redirected to GitHub $\to$ Returns to callback.
 2. **Session established**: App generates a secure `session_id`, stores user data in `SESSION_CACHE`, and sets a `user_session` cookie on the client.
 3. **API Request**:
-    - **Cookie Auth**: User calls an endpoint $\to$ `get_session_user` retrieves data from `SESSION_CACHE`.
-    - **Bearer Auth**: User provides a token $\to$ `get_optional_user` validates the token with GitHub (and `TOKEN_CACHE`) to resolve the username.
-    - **Client/Service Init**: `GitHubClient` is initialized with the resolved token. `GitHubService` is initialized with the client $\to$ Request is made to GitHub API via the service.
+    - **Session/Token Resolution**: User calls an endpoint $\to$ `github_provider` factory resolves the user (Cookie or Bearer).
+    - **Service Injection**: `GitHubService` is initialized with a `GitHubClient` and injected into the route handler.
+    - **Auth Enforcement**: If `required=True`, the provider raises 401 Unauthorized for unauthenticated requests.
 4. **Resilience**: If GitHub API returns 429 (Rate Limit) or 5xx, the client handles retries internally before returning to the route handler.

@@ -1,13 +1,15 @@
 from typing import Any, List
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 
-from src.dependencies.github import get_github_service, get_optional_github_service
+from src.dependencies.github import github_provider
 from src.github.service import GitHubService
 from src.models.error import AuthError, NotFoundError, RateLimitError, ValidationError
 from src.models.github import IssueRequest, IssueResponse
 
 router = APIRouter()
+logger = structlog.get_logger(__name__)
 
 
 @router.post("/repos/{owner}/{repo}/issues", response_model=IssueResponse)
@@ -15,8 +17,9 @@ async def create_issue(
     owner: str,
     repo: str,
     issue: IssueRequest,
-    service: GitHubService = Depends(get_github_service),
+    service: GitHubService = Depends(github_provider(required=True)),
 ) -> Any:
+    logger.debug("create_issue_request", owner=owner, repo=repo)
     try:
         return await service.create_issue(owner, repo, issue.model_dump())
     except AuthError as e:
@@ -37,8 +40,11 @@ async def create_issue(
 
 @router.get("/repos/{owner}/{repo}/issues", response_model=List[IssueResponse])
 async def list_issues(
-    owner: str, repo: str, service: GitHubService = Depends(get_optional_github_service)
+    owner: str,
+    repo: str,
+    service: GitHubService = Depends(github_provider(required=False)),
 ) -> Any:
+    logger.debug("list_issues_request", owner=owner, repo=repo)
     try:
         return await service.list_issues(owner, repo)
     except AuthError as e:

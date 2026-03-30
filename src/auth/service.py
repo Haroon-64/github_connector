@@ -33,6 +33,7 @@ class GitHubAuthService:
         scope: Optional[str] = None,
     ) -> str:
         """Generate GitHub OAuth login URL."""
+        logger.debug("generating_login_url", scope=scope)
         try:
             kwargs: Dict[str, Any] = {}
             if scope:
@@ -49,6 +50,7 @@ class GitHubAuthService:
 
     async def handle_callback(self, request: Request) -> Dict[str, Any]:
         """Handle GitHub OAuth callback and retrieve user info."""
+        logger.debug("handling_oauth_callback")
         try:
             token = await self.oauth.github.authorize_access_token(request)
             user_info = await self.oauth.github.get("user", token=token)
@@ -68,6 +70,7 @@ class GitHubAuthService:
 
     async def revoke_token(self, access_token: str) -> None:
         """Revoke the GitHub access token."""
+        logger.debug("revoking_token")
         try:
             url = (
                 f"https://api.github.com/applications/{settings.OAUTH_CLIENT_ID}/token"
@@ -79,7 +82,12 @@ class GitHubAuthService:
                     auth=(settings.OAUTH_CLIENT_ID, settings.OAUTH_SECRET),
                     json={"access_token": access_token},
                 )
-                if response.status_code not in [204, 404]:
+                if response.status_code == 429:
+                    logger.warning(
+                        "token_revocation_rate_limited",
+                        detail="Proceeding with logout anyway",
+                    )
+                elif response.status_code not in [204, 404]:
                     logger.warning(
                         "token_revocation_failed", status_code=response.status_code
                     )

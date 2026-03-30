@@ -8,25 +8,28 @@ import httpx
 import structlog
 
 from src.core.config import settings
-from src.github.retry_policy import GitHubRetryPolicy, RetryDecision, RetryType
+from src.github.retry_policy import GitHubRetryPolicy, RetryType
 from src.models.error import (
     AuthError,
     ConflictError,
-    NetworkError,
     NotFoundError,
     PermissionError,
     RateLimitError,
     RedirectError,
     ServerError,
-    TimeoutError,
     ValidationError,
 )
 
 logger = structlog.get_logger(__name__)
 
+# Keyed by access_token (or None for unauthenticated).
+# Stores: {"remaining": int, "reset": float}
+RATE_LIMIT_STATE: Dict[Optional[str], Dict[str, Any]] = {}
+
 
 class GitHubClient:
     def __init__(self, access_token: Optional[str] = None):
+        self._access_token = access_token
         self.base_url = settings.GITHUB_API_URL
         self.headers = {
             "Accept": "application/vnd.github+json",
@@ -36,8 +39,6 @@ class GitHubClient:
             self.headers["Authorization"] = f"Bearer {access_token}"
         self.timeout = 10.0
         self._client: Optional[httpx.AsyncClient] = None
-        self._rate_limit_remaining: Optional[int] = None
-        self._rate_limit_reset: Optional[float] = None
         self.retry_policy = GitHubRetryPolicy(max_time=300.0)
 
     @property
@@ -45,54 +46,6 @@ class GitHubClient:
         if self._client is None:
             self._client = httpx.AsyncClient(timeout=self.timeout, headers=self.headers)
         return self._client
-
-    async def aclose(self) -> None:
-        if self._client is not None:
-            await self._client.aclose()
-            self._client = None
-
-    def _parse_link_header(self, header: str) -> Dict[str, str]:
-        links: Dict[str, str] = {}
-        if not header:
-            return links
-        parts = header.split(",")
-        for part in parts:
-            match = re.search(r'<(.*)>; rel="(.*)"', part.strip())
-            if match:
-                url, rel = match.groups()
-                links[rel] = url
-        return links
-
-    def _get_error_details(self, response: httpx.Response) -> Any:
-        try:
-            return response.json()
-        except Exception:
-            logger.error("failed_to_parse_error_response", response=response.text)
-            return response.text
-
-    async def _throttle_and_pace(self) -> None:
-        if self._rate_limit_remaining is None or self._rate_limit_reset is None:
-            return
-
-        wait_time = 0.0
-        if self._rate_limit_remaining <= 0:
-            wait_time = max(0.01, self._rate_limit_reset - time.time())
-            wait_time += random.uniform(0, 1)
-        elif self._rate_limit_remaining < 100:
-            time_to_reset = max(0.01, self._rate_limit_reset - time.time())
-            wait_time = time_to_reset / max(1, self._rate_limit_remaining)
-
-        if wait_time > 0:
-            logger.debug("github_request_pacing_or_throttle", wait=wait_time)
-            await asyncio.sleep(wait_time)
-
-    def _update_rate_limit_headers(self, response: httpx.Response) -> None:
-        remaining = response.headers.get("x-ratelimit-remaining")
-        reset = response.headers.get("x-ratelimit-reset")
-        if remaining is not None:
-            self._rate_limit_remaining = int(remaining)
-        if reset is not None:
-            self._rate_limit_reset = float(reset)
 
     async def request(
         self,
@@ -119,35 +72,69 @@ class GitHubClient:
 
         return all_data
 
-    def _handle_network_exception(
-        self,
-        e: Exception,
-        attempt_counts: Dict[RetryType, int],
-    ) -> RetryDecision:
-        return self.retry_policy.evaluate_exception(e, attempt_counts)
+    async def aclose(self) -> None:
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
 
-    def _finalize_response(self, response: httpx.Response, method: str) -> Any:
-        status = response.status_code
-        if status in (200, 201):
-            return self._process_success_response(response, method)
-        if status == 204:
-            return None, None
-        self._raise_for_status(response)
+    def _parse_link_header(self, header: str) -> Dict[str, str]:
+        links: Dict[str, str] = {}
+        if not header:
+            return links
+        parts = header.split(",")
+        for part in parts:
+            match = re.search(r'<(.*)>; rel="(.*)"', part.strip())
+            if match:
+                url, rel = match.groups()
+                links[rel] = url
+        return links
 
-    def _check_stop_limits(
-        self,
-        decision: RetryDecision,
-        attempt_counts: Dict[RetryType, int],
-        start_time: float,
-    ) -> None:
-        if self.retry_policy.should_stop(decision, attempt_counts, start_time):
-            if decision.retry_type == RetryType.RATE_LIMIT:
-                raise RateLimitError()
-            if decision.retry_type == RetryType.SERVER:
-                raise ServerError()
-            if decision.retry_type == RetryType.TIMEOUT:
-                raise TimeoutError()
-            raise NetworkError()
+    def _get_error_details(self, response: httpx.Response) -> Any:
+        try:
+            return response.json()
+        except Exception:
+            logger.error("failed_to_parse_error_response", response=response.text)
+            return response.text
+
+    async def _throttle_and_pace(self) -> None:
+        state = RATE_LIMIT_STATE.get(self._access_token)
+        if not state:
+            return
+
+        remaining = state.get("remaining")
+        reset = state.get("reset")
+        if remaining is None or reset is None:
+            return
+
+        wait_time = 0.0
+        if remaining <= 0:
+            wait_time = max(0.01, reset - time.time())
+            wait_time += random.uniform(0, 1)
+        elif remaining < 100:
+            time_to_reset = max(0.01, reset - time.time())
+            wait_time = time_to_reset / max(1, remaining)
+
+        if wait_time > 0:
+            # Short-circuit if wait is too long
+            if wait_time > 600:
+                logger.warning("pacing_wait_too_long", wait=wait_time)
+                raise RateLimitError(
+                    detail=f"Rate limit pacing requires {int(wait_time)}s wait."
+                )
+
+            logger.debug("github_request_pacing_or_throttle", wait=wait_time)
+            await asyncio.sleep(wait_time)
+
+    def _update_rate_limit_headers(self, response: httpx.Response) -> None:
+        remaining = response.headers.get("x-ratelimit-remaining")
+        reset = response.headers.get("x-ratelimit-reset")
+        if remaining is not None or reset is not None:
+            state = RATE_LIMIT_STATE.get(self._access_token, {})
+            if remaining is not None:
+                state["remaining"] = int(remaining)
+            if reset is not None:
+                state["reset"] = float(reset)
+            RATE_LIMIT_STATE[self._access_token] = state
 
     async def _fetch_page_with_retries(
         self,
@@ -175,13 +162,13 @@ class GitHubClient:
                 decision = self.retry_policy.evaluate_response(response, attempt_counts)
 
             except (httpx.TimeoutException, httpx.RequestError) as e:
-                decision = self._handle_network_exception(e, attempt_counts)
+                decision = self.retry_policy.evaluate_exception(e, attempt_counts)
 
             if decision is None:
                 return self._finalize_response(response, method)
 
             attempt_counts[decision.retry_type] += 1
-            self._check_stop_limits(decision, attempt_counts, start_time)
+            self.retry_policy.check_stop_limits(decision, attempt_counts, start_time)
 
             logger.warning(
                 "github_request_retry",
@@ -191,6 +178,14 @@ class GitHubClient:
             )
 
             await asyncio.sleep(decision.wait)
+
+    def _finalize_response(self, response: httpx.Response, method: str) -> Any:
+        status = response.status_code
+        if status in (200, 201):
+            return self._process_success_response(response, method)
+        if status == 204:
+            return None, None
+        self._raise_for_status(response)
 
     def _process_success_response(self, response: httpx.Response, method: str) -> Any:
         page_data = response.json() if response.content else None

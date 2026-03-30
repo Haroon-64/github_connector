@@ -34,10 +34,9 @@ Authentication is implemented with `Authlib` and maintains minimal server-side s
 
 Uses FastAPI’s dependency system to supply authenticated context to routes.
 
-* **`auth.py` and `github.py`**:
-  * `get_session_user`: Validates the `user_session` cookie against `SESSION_CACHE`.
-  * `get_optional_user`: Handles both session-based auth and `Authorization: Bearer` headers. Bearer tokens are dynamically validated via a call to GitHub's `/user`.
-  * Provides a configured `GitHubService` (backed by a `GitHubClient`) to route handlers.
+* **`github.py` and `auth.py`**:
+  * `get_optional_user`: Handles both session-based auth and `Authorization: Bearer` headers.
+  * **Unified Provider**: `github_provider(required=True/False)` is the single interface for retrieving a configured `GitHubService`. It internally resolves the user and initializes the necessary client.
 
 ## 5. GitHub Service and Client (`src/github/`)
 

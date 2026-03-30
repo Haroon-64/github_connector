@@ -11,7 +11,7 @@ class LoginResponse(BaseModel):
 class CallbackResponse(BaseModel):
     """Response model for callback endpoint."""
 
-    access_token: str
+    # access_token: str
     token_type: str
     username: str
     created_at: int

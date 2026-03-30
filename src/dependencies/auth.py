@@ -2,9 +2,9 @@ from typing import Any, Dict, Optional
 
 import structlog
 from fastapi import Depends, HTTPException, Request, status
-from src.auth.service import GitHubAuthService
 
 from src.auth.oauth import oauth
+from src.auth.service import GitHubAuthService
 from src.core.session import SESSION_CACHE, TOKEN_CACHE
 from src.github.client import GitHubClient
 
