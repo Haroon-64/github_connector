@@ -1,12 +1,15 @@
+import secrets
 import time
 from typing import Any, Dict, Optional
 
 import httpx
 import structlog
 from authlib.integrations.starlette_client import OAuth
+from fastapi import Response
 from starlette.requests import Request
 
 from src.core.config import settings
+from src.core.session import SESSION_CACHE
 
 logger = structlog.get_logger(__name__)
 
@@ -95,3 +98,46 @@ class GitHubAuthService:
                     logger.info("token_revoked_successfully")
         except Exception as e:
             logger.error("token_revocation_error", error=str(e))
+
+    def create_session(self, user_info: Dict[str, Any]) -> str:
+        """Create a new user session and store it in the cache."""
+        session_id = secrets.token_urlsafe(32)
+        user_data = {
+            "username": user_info["username"],
+            "access_token": user_info["access_token"],
+            "created_at": user_info["created_at"],
+        }
+        SESSION_CACHE[session_id] = user_data
+        logger.info("session_created", username=user_data["username"])
+        return session_id
+
+    def delete_session(self, session_id: str) -> None:
+        """Delete a user session from the cache."""
+        if session_id in SESSION_CACHE:
+            username = SESSION_CACHE[session_id].get("username")
+            del SESSION_CACHE[session_id]
+            logger.info("session_deleted", username=username)
+        else:
+            logger.debug("session_not_found_in_cache", session_id=session_id)
+
+    async def logout_user(
+        self, response: Response, session_id: Optional[str], access_token: Optional[str]
+    ) -> None:
+        """Revoke token, delete session, and clear cookie."""
+        if access_token:
+            await self.revoke_token(access_token)
+        if session_id:
+            self.delete_session(session_id)
+        response.delete_cookie(key="user_session")
+
+    def login_user(self, response: Response, user_info: Dict[str, Any]) -> str:
+        """Create session and set cookie on response."""
+        session_id = self.create_session(user_info)
+        response.set_cookie(
+            key="user_session",
+            value=session_id,
+            httponly=True,
+            samesite="lax",
+            secure=True,
+        )
+        return session_id

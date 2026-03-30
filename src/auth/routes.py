@@ -1,5 +1,4 @@
-import secrets
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -7,11 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from src.auth.service import GitHubAuthError, GitHubAuthService
 from src.core.config import settings
 from src.core.constants import GITHUB_SCOPES
-from src.core.session import SESSION_CACHE
 from src.dependencies.auth import (
+    auth_provider,
     get_auth_service,
-    get_current_user,
-    get_session_user,
 )
 from src.models.auth import CallbackResponse, LoginResponse, UserResponse
 
@@ -57,23 +54,8 @@ async def github_callback(
     try:
         result = await auth_service.handle_callback(request)
 
-        # Store user in an HTTP-only cookie
-        user_data = {
-            "username": result["username"],
-            "access_token": result["access_token"],
-            "created_at": result["created_at"],
-        }
-
-        session_id = secrets.token_urlsafe(32)
-        SESSION_CACHE[session_id] = user_data
-
-        response.set_cookie(
-            key="user_session",
-            value=session_id,
-            httponly=True,
-            samesite="lax",
-            secure=True,
-        )
+        # Store user in an HTTP-only cookie using the service layer
+        auth_service.login_user(response, result)
 
         return CallbackResponse(
             token_type=result["token_type"],
@@ -88,25 +70,23 @@ async def github_callback(
 async def logout(
     request: Request,
     response: Response,
-    user: Optional[dict[str, Any]] = Depends(get_session_user),
+    user: Optional[Dict[str, Any]] = Depends(auth_provider(required=False)),
     auth_service: GitHubAuthService = Depends(get_auth_service),
 ) -> Any:
     """Log out the user by clearing the session cookie and revoking the token."""
-    logger.debug("logout_requested", username=user.get("username") if user else None)
-    if user and user.get("access_token"):
-        await auth_service.revoke_token(user["access_token"])
-
     session_id = request.cookies.get("user_session")
-    if session_id and session_id in SESSION_CACHE:
-        del SESSION_CACHE[session_id]
+    await auth_service.logout_user(
+        response=response,
+        session_id=session_id,
+        access_token=user.get("access_token") if user else None,
+    )
 
-    response.delete_cookie(key="user_session")
     return {"message": "Logged out successfully"}
 
 
 @auth_router.get("/me", response_model=UserResponse)
 async def get_me(
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(auth_provider(required=True)),
 ) -> UserResponse:
     """Get currently authenticated user info."""
     logger.debug("get_me_requested", username=current_user.get("username"))
