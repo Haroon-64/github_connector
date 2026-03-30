@@ -37,12 +37,13 @@ This document outlines the key technical decisions made during the development o
 
 ## 4. Error Handling Strategy
 
-### Decision: Custom Exception Hierarchy
+### Decision: Custom Exception Hierarchy with Centralized Handling
 
 **Rationale**: GitHub returns various error types. We map these to a custom hierarchy (e.g., `NotFoundError`, `RateLimitError`, `ValidationError`).
 
-- **Standardization**: All GitHub-related errors are caught and re-raised as standard application errors.
-- **API Consistency**: Routes can catch these specific errors and return standardized JSON responses to the client.
+- **Standardization**: All GitHub-related errors are caught and re-raised as standard application errors (`ApiError`).
+- **Centralized Handling**: A global exception handler in `app.py` catches these errors, ensuring consistent JSON responses across all endpoints. This keeps route handlers thin and maintainable.
+- **Backward Compatibility**: The handler includes a `detail` key to support standard FastAPI client expectations and existing tests.
 
 ## 5. Structured Logging
 
@@ -59,7 +60,7 @@ To maintain the project's focus as a "simple cloud connector", the following ite
 ### 1. Persistent Database
 
 - **Status**: Limited (In-Memory).
-- **Rationale**: User sessions and OAuth states are managed through secret session IDs and memory-based caches (`SESSION_CACHE`, `TOKEN_CACHE`). Introducing a full-featured database (e.g., PostgreSQL/Redis) would add significant deployment complexity. For current scale, in-memory structures are sufficient, with clear "TODO" markers for when persistent storage becomes necessary.
+- **Rationale**: User sessions and OAuth states are managed through secret session IDs and memory-based caches (`SESSION_CACHE`, `TOKEN_CACHE`). Introducing a full-featured database (e.g., PostgreSQL/Redis) would add significant deployment complexity. For current scale, in-memory structures are sufficient.
 
 ### 2. Frontend Application
 
