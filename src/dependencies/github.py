@@ -1,12 +1,14 @@
+from functools import lru_cache
 from typing import Any, Callable, Dict, Optional
 
 from fastapi import Depends, HTTPException, status
 
-from src.dependencies.auth import get_optional_user
+from src.dependencies.auth import auth_provider
 from src.github.client import GitHubClient
 from src.github.service import GitHubService
 
 
+@lru_cache()
 def github_provider(required: bool = True) -> Callable[..., Any]:
     """
     Unified dependency provider for GitHub services.
@@ -14,7 +16,7 @@ def github_provider(required: bool = True) -> Callable[..., Any]:
     """
 
     def _get_github(
-        user: Optional[Dict[str, Any]] = Depends(get_optional_user),
+        user: Optional[Dict[str, Any]] = Depends(auth_provider(required=False)),
     ) -> GitHubService:
         if required and not user:
             raise HTTPException(
