@@ -67,6 +67,7 @@ paths:
       tags:
         - repos
       summary: List Repos
+      description: List repos by user or org, return current users' if none provided
       operationId: list_repos_github_repos_get
       parameters:
         - name: username
@@ -95,35 +96,6 @@ paths:
                 items:
                   $ref: "#/components/schemas/RepositoryResponse"
                 title: Response List Repos Github Repos Get
-        "422":
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HTTPValidationError"
-  /github/repos/{owner}:
-    get:
-      tags:
-        - repos
-      summary: List User Repos
-      operationId: list_user_repos_github_repos__owner__get
-      parameters:
-        - name: owner
-          in: path
-          required: true
-          schema:
-            type: string
-            title: Owner
-      responses:
-        "200":
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/RepositoryResponse"
-                title: Response List User Repos Github Repos  Owner  Get
         "422":
           description: Validation Error
           content:
@@ -584,11 +556,6 @@ components:
         created_at:
           type: integer
           title: Created At
-        expires_at:
-          anyOf:
-            - type: integer
-            - type: 'null'
-          title: Expires At
       type: object
       required:
         - username
