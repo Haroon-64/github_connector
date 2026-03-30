@@ -3,7 +3,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
-from src.auth.service.github import GitHubAuthError, GitHubAuthService
+from src.auth.service import GitHubAuthError, GitHubAuthService
 from src.core.config import settings
 from src.core.constants import GITHUB_SCOPES
 from src.core.session import SESSION_CACHE
