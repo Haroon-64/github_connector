@@ -35,9 +35,9 @@ class RepositoryResponse(GitHubBaseModel):
 
 class IssueRequest(BaseModel):
     title: str
-    body: Optional[str] = None
-    assignees: Optional[List[str]] = None
-    labels: Optional[List[str]] = None
+    body: str = ""
+    assignees: List[str] = []
+    labels: List[str] = []
 
 
 class IssueResponse(GitHubBaseModel):
@@ -50,10 +50,10 @@ class IssueResponse(GitHubBaseModel):
 
 
 class PRRequest(BaseModel):
-    title: str
-    head: str
-    base: str
-    body: Optional[str] = None
+    title: str = ''
+    head: str = 'master'
+    base: str = 'branch-name'
+    body: str = ''
 
 
 class PRResponse(GitHubBaseModel):
