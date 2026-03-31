@@ -48,8 +48,7 @@ A FastAPI-based application designed to interface with the GitHub API. It featur
     4. Copy the **Client ID** and **Client Secret**
     5. Paste them in the `.env` file
     - `OAUTH_CLIENT_ID`: Your GitHub OAuth App Client ID.
-    - `GITHUB_CLIENT_SECRET`: Your GitHub OAuth App Client Secret.
-    - `OAUTH_SECRET`: A secure key for session encryption. Generate a random string of 32 characters.
+    - `OAUTH_SECRET`: A secure key for session encryption. Generated from github oauth app.
 
 ## Running the Application
 
