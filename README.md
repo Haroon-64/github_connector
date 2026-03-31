@@ -20,7 +20,7 @@ A FastAPI-based application designed to interface with the GitHub API. It featur
 ## Prerequisites
 
 - Python 3.12+
-- [uv](https://github.com/astral-sh/uv) (recommended) or pip
+- [uv](https://github.com/astral-sh/uv) (recommended)
 - GitHub OAuth App credentials (Client ID and Client Secret)
 
 ## Installation
@@ -58,12 +58,6 @@ Using `uv`:
 ```bash
 uv sync
 uv run dev
-```
-
-Using standard Python:
-
-```bash
-python -m src.app
 ```
 
 The API will be available at `http://127.0.0.1:8000`.
