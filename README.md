@@ -113,7 +113,7 @@ curl -X POST http://localhost:8000/github/repos/octocat/hello-world/issues \
 - **4. Tech Stack**: Built with **Python 3.12+** and **FastAPI**, following modern asynchronous patterns.
 - **5. Code Spec**:
   - **Modularity**: Clearly separated routes, services, models, and core configuration.
-  - **Error Handling**: Custom exception hierarchy and exponential backoff for API resilience.
+  - **Error Handling**: Custom exception hierarchy and exponential backoff for API resilience. Referenced [from](https://oneuptime.com/blog/post/2025-01-06-python-retry-exponential-backoff/view) 
   - **Testing**: test suite covering authentication flow and GitHub routes.
 
 ## Project Structure
