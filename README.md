@@ -20,7 +20,7 @@ A FastAPI-based application designed to interface with the GitHub API. It featur
 ## Prerequisites
 
 - Python 3.12+
-- [uv](https://github.com/astral-sh/uv) (recommended) or pip
+- [uv](https://github.com/astral-sh/uv) (recommended)
 - GitHub OAuth App credentials (Client ID and Client Secret)
 
 ## Installation
@@ -28,7 +28,7 @@ A FastAPI-based application designed to interface with the GitHub API. It featur
 1. Clone the repository:
 
    ```bash
-   git clone <repository-url>
+   git clone git@github.com:Haroon-64/github_connector.git
    cd github_connector
    ```
 
@@ -60,25 +60,18 @@ uv sync
 uv run dev
 ```
 
-Using standard Python:
-
-```bash
-python -m src.app
-```
-
 The API will be available at `http://127.0.0.1:8000`.
 
-## Authentication
+## Login
 
 1. Go to [http://127.0.0.1:8000/auth/github/login](http://127.0.0.1:8000/auth/github/login)
-2. Click on **Login with GitHub**
+2. Click on **Login url**
 3. Authorize the application
 4. You will be redirected to the callback URL
 5. You will see the following response:
 
 ```json
 {
-  "access_token": "<ACCESS_TOKEN>",
   "token_type": "bearer",
   "username": "<USERNAME>",
   "created_at": "<CREATED_AT>"
