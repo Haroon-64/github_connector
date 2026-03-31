@@ -158,3 +158,184 @@ async def test_client_aclose(github_client):
         await github_client.aclose()
         mock_aclose.assert_called_once()
         assert github_client._client is None
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: GitHubClient + GitHubRetryPolicy
+# Patches httpx.AsyncClient.request at the HTTP level to exercise the real
+# retry policy without real network calls or real delays.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+@patch("asyncio.sleep", new_callable=AsyncMock)
+@patch("httpx.AsyncClient.request")
+async def test_integration_retry_on_rate_limit(mock_request, mock_sleep):
+    """End-to-end: client retries on 429 and succeeds on second attempt.
+
+    Requirements: 4.2, 4.3, 5.5
+    """
+    rate_limit_response = httpx.Response(429, headers={"retry-after": "0.01"})
+    success_response = httpx.Response(200, json={"name": "repo1"})
+    mock_request.side_effect = [rate_limit_response, success_response]
+
+    client = GitHubClient("fake_token")
+    result = await client.request("GET", "/repos/user/repo")
+
+    assert result == {"name": "repo1"}
+    assert mock_request.call_count == 2
+    # sleep was called at least once for the retry wait
+    assert mock_sleep.call_count >= 1
+
+
+@pytest.mark.anyio
+@patch("asyncio.sleep", new_callable=AsyncMock)
+@patch("httpx.AsyncClient.request")
+async def test_integration_retry_on_server_error(mock_request, mock_sleep):
+    """End-to-end: client retries on 500 and succeeds on second attempt.
+
+    Requirements: 4.2, 4.3, 5.5
+    """
+    server_error_response = httpx.Response(500)
+    success_response = httpx.Response(200, json=[{"name": "repo1"}])
+    mock_request.side_effect = [server_error_response, success_response]
+
+    client = GitHubClient("fake_token")
+    result = await client.request("GET", "/users/user/repos")
+
+    assert result == [{"name": "repo1"}]
+    assert mock_request.call_count == 2
+    assert mock_sleep.call_count >= 1
+
+
+@pytest.mark.anyio
+@patch("httpx.AsyncClient.request")
+async def test_integration_pagination_works(mock_request):
+    """End-to-end: pagination accumulates all pages correctly.
+
+    Requirements: 4.3
+    """
+    page1 = httpx.Response(
+        200,
+        headers={"Link": '<https://api.github.com/users/user/repos?page=2>; rel="next"'},
+        json=[{"name": "repo1"}],
+    )
+    page2 = httpx.Response(200, json=[{"name": "repo2"}, {"name": "repo3"}])
+    mock_request.side_effect = [page1, page2]
+
+    client = GitHubClient("fake_token")
+    result = await client.request("GET", "/users/user/repos")
+
+    assert result == [{"name": "repo1"}, {"name": "repo2"}, {"name": "repo3"}]
+    assert mock_request.call_count == 2
+
+
+@pytest.mark.anyio
+@patch("httpx.AsyncClient.request")
+async def test_integration_rate_limit_state_updated_across_requests(mock_request):
+    """End-to-end: rate limit state is updated from response headers across requests.
+
+    Requirements: 4.2, 5.5
+    """
+    import time
+
+    reset_time = str(int(time.time()) + 3600)
+
+    response1 = httpx.Response(
+        200,
+        headers={
+            "x-ratelimit-remaining": "4999",
+            "x-ratelimit-reset": reset_time,
+        },
+        json=[{"name": "repo1"}],
+    )
+    response2 = httpx.Response(
+        200,
+        headers={
+            "x-ratelimit-remaining": "4998",
+            "x-ratelimit-reset": reset_time,
+        },
+        json=[{"name": "repo2"}],
+    )
+    mock_request.side_effect = [response1, response2]
+
+    client = GitHubClient("fake_token")
+
+    await client.request("GET", "/users/user/repos1")
+    state_after_first = client.retry_policy._rate_limit_state.get("fake_token")
+    assert state_after_first is not None
+    assert state_after_first["remaining"] == 4999
+
+    await client.request("GET", "/users/user/repos2")
+    state_after_second = client.retry_policy._rate_limit_state.get("fake_token")
+    assert state_after_second is not None
+    assert state_after_second["remaining"] == 4998
+
+
+# ---------------------------------------------------------------------------
+# Property-based tests for GitHubClient
+# ---------------------------------------------------------------------------
+
+from hypothesis import given, settings as h_settings
+from hypothesis import strategies as st
+
+
+@h_settings(max_examples=20, deadline=None)
+@given(
+    pages=st.lists(
+        st.lists(
+            st.dictionaries(
+                keys=st.text(min_size=1, max_size=20),
+                values=st.one_of(st.text(max_size=50), st.integers(), st.booleans()),
+                min_size=0,
+                max_size=5,
+            ),
+            min_size=0,
+            max_size=5,
+        ),
+        min_size=1,
+        max_size=6,
+    )
+)
+def test_property_pagination_accumulates_all_pages_correctly(pages):
+    """Property 4: Pagination accumulates all pages correctly.
+
+    **Validates: Requirements 4.3**
+
+    Generate arbitrary number of pages with random data and verify all pages
+    are accumulated in the correct order.
+    """
+    import asyncio
+    import json
+    from unittest.mock import AsyncMock, patch
+
+    base_url = "https://api.github.com"
+
+    def make_responses(pages):
+        responses = []
+        for i, page_data in enumerate(pages):
+            is_last = i == len(pages) - 1
+            if is_last:
+                headers = {}
+            else:
+                next_url = f"{base_url}/users/user/repos?page={i + 2}"
+                headers = {"Link": f'<{next_url}>; rel="next"'}
+            responses.append(
+                httpx.Response(200, headers=headers, json=page_data)
+            )
+        return responses
+
+    async def run():
+        client = GitHubClient("fake_token")
+        responses = make_responses(pages)
+        with patch("httpx.AsyncClient.request", side_effect=responses):
+            result = await client.request("GET", "/users/user/repos")
+        return result
+
+    result = asyncio.run(run())
+
+    expected = []
+    for page in pages:
+        expected.extend(page)
+
+    assert result == expected

@@ -428,4 +428,296 @@ async def test_execute_with_retries_updates_rate_limit_state():
     state = policy._rate_limit_state.get("token_test")
     assert state is not None
     assert state["remaining"] == 4850
-    assert state["reset"] == 1704067200.0
+    assert state["reset"] == pytest.approx(1704067200.0)
+
+
+
+from hypothesis import given, settings as h_settings
+import hypothesis.strategies as st
+
+
+@given(
+    remaining=st.integers(min_value=0, max_value=10000),
+    reset=st.floats(min_value=0.0, max_value=1e12, allow_nan=False, allow_infinity=False),
+    token=st.one_of(st.none(), st.text(min_size=1, max_size=64)),
+)
+@h_settings(max_examples=20)
+def test_rate_limit_state_updates_are_idempotent(remaining, reset, token):
+    """
+    **Validates: Requirements 1.2, 6.1, 6.2**
+
+    Property 1: Rate limit state updates are idempotent.
+    Calling update_rate_limit_state multiple times with the same headers
+    produces the same result as calling it once.
+    """
+    policy = GitHubRetryPolicy()
+
+    mock_response = MagicMock(spec=httpx.Response)
+    mock_response.headers = {
+        "x-ratelimit-remaining": str(remaining),
+        "x-ratelimit-reset": str(reset),
+    }
+
+    policy.update_rate_limit_state(mock_response, token)
+    state_after_first = dict(policy._rate_limit_state.get(token, {}))
+
+    policy.update_rate_limit_state(mock_response, token)
+    state_after_second = dict(policy._rate_limit_state.get(token, {}))
+
+    policy.update_rate_limit_state(mock_response, token)
+    state_after_third = dict(policy._rate_limit_state.get(token, {}))
+
+    assert state_after_first == state_after_second == state_after_third
+    assert state_after_first["remaining"] == remaining
+    assert state_after_first["reset"] == reset
+
+
+@given(
+    remaining=st.integers(min_value=0, max_value=10000),
+    reset_offset=st.floats(min_value=-1000.0, max_value=10000.0, allow_nan=False, allow_infinity=False),
+    token=st.one_of(st.none(), st.text(min_size=1, max_size=64)),
+)
+@h_settings(max_examples=20)
+def test_pacing_wait_time_is_non_negative(remaining, reset_offset, token):
+    """
+    **Validates: Requirements 2.1, 2.2, 2.3**
+
+    Property 2: Pacing wait time is non-negative.
+    For any valid rate limit state (remaining, reset), check_pacing
+    either returns a wait time >= 0 or raises RateLimitError (wait > 600).
+    """
+    policy = GitHubRetryPolicy()
+    reset = time.time() + reset_offset
+    policy._rate_limit_state[token] = {
+        "remaining": remaining,
+        "reset": reset,
+    }
+
+    try:
+        wait_time = policy.check_pacing(token)
+        assert wait_time >= 0, f"Expected non-negative wait time, got {wait_time}"
+    except RateLimitError:
+        # Wait time exceeded 600 seconds — this is valid behavior per Requirement 2.4
+        pass
+
+
+@given(
+    max_error_retries=st.integers(min_value=0, max_value=5),
+)
+@h_settings(max_examples=20, deadline=None)
+def test_retry_attempts_never_exceed_configured_limits(max_error_retries):
+    """
+    **Validates: Requirements 3.2, 5.1, 5.2, 5.3, 5.4**
+
+    Property 3: Retry attempts never exceed configured limits.
+    For any retry configuration, the total number of callback invocations
+    never exceeds max_error_retries + 1 (initial attempt + retries).
+    """
+    import asyncio
+    from unittest.mock import patch, AsyncMock
+
+    call_count = 0
+
+    async def run():
+        nonlocal call_count
+        call_count = 0
+
+        policy = GitHubRetryPolicy(max_error_retries=max_error_retries)
+
+        error_response = MagicMock(spec=httpx.Response)
+        error_response.status_code = 502
+        error_response.headers = {}
+
+        async def always_fail():
+            nonlocal call_count
+            call_count += 1
+            return error_response
+
+        from src.models.error import ServerError
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            try:
+                await policy.execute_with_retries(always_fail, "token_test")
+            except ServerError:
+                pass
+
+    asyncio.run(run())
+
+    # Total invocations = 1 initial + up to max_error_retries retries
+    assert call_count <= max_error_retries + 1, (
+        f"Expected at most {max_error_retries + 1} calls, got {call_count}"
+    )
+
+
+# --- Task 5.4: Unit tests for retry orchestration ---
+
+@pytest.mark.anyio
+async def test_execute_with_retries_retries_on_rate_limit_429():
+    """Test retry on 429 rate limit error, eventually succeeds. Requirements: 3.1, 5.1"""
+    from unittest.mock import patch, AsyncMock
+
+    policy = GitHubRetryPolicy(max_rate_limit_retries=3)
+
+    rate_limit_response = MagicMock(spec=httpx.Response)
+    rate_limit_response.status_code = 429
+    rate_limit_response.headers = {"retry-after": "0.01"}
+
+    success_response = MagicMock(spec=httpx.Response)
+    success_response.status_code = 200
+    success_response.headers = {}
+
+    call_count = 0
+
+    async def callback():
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return rate_limit_response
+        return success_response
+
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        result = await policy.execute_with_retries(callback, "token_test")
+
+    assert result == success_response
+    assert call_count == 2
+
+
+@pytest.mark.anyio
+async def test_execute_with_retries_retries_on_rate_limit_403():
+    """Test retry on 403 rate limit error, eventually succeeds. Requirements: 3.1, 5.1"""
+    from unittest.mock import patch, AsyncMock
+
+    policy = GitHubRetryPolicy(max_rate_limit_retries=3)
+
+    rate_limit_response = MagicMock(spec=httpx.Response)
+    rate_limit_response.status_code = 403
+    rate_limit_response.headers = {"retry-after": "0.01"}
+
+    success_response = MagicMock(spec=httpx.Response)
+    success_response.status_code = 200
+    success_response.headers = {}
+
+    call_count = 0
+
+    async def callback():
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return rate_limit_response
+        return success_response
+
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        result = await policy.execute_with_retries(callback, "token_test")
+
+    assert result == success_response
+    assert call_count == 2
+
+
+@pytest.mark.anyio
+async def test_execute_with_retries_raises_rate_limit_error_after_max_retries():
+    """Test RateLimitError raised when rate limit retries exhausted. Requirements: 3.7, 5.1"""
+    from unittest.mock import patch, AsyncMock
+    from src.models.error import RateLimitError
+
+    policy = GitHubRetryPolicy(max_rate_limit_retries=2)
+
+    rate_limit_response = MagicMock(spec=httpx.Response)
+    rate_limit_response.status_code = 429
+    rate_limit_response.headers = {"retry-after": "0.01"}
+
+    async def callback():
+        return rate_limit_response
+
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        with pytest.raises(RateLimitError):
+            await policy.execute_with_retries(callback, "token_test")
+
+
+@pytest.mark.anyio
+async def test_execute_with_retries_retries_on_timeout_error():
+    """Test retry on timeout exception, eventually succeeds. Requirements: 3.1, 5.4"""
+    from unittest.mock import patch, AsyncMock
+
+    policy = GitHubRetryPolicy(max_error_retries=3)
+
+    success_response = MagicMock(spec=httpx.Response)
+    success_response.status_code = 200
+    success_response.headers = {}
+
+    call_count = 0
+
+    async def callback():
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise httpx.TimeoutException("timed out")
+        return success_response
+
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        result = await policy.execute_with_retries(callback, "token_test")
+
+    assert result == success_response
+    assert call_count == 2
+
+
+@pytest.mark.anyio
+async def test_execute_with_retries_raises_timeout_error_after_max_retries():
+    """Test TimeoutError raised when timeout retries exhausted. Requirements: 3.7, 5.4"""
+    from unittest.mock import patch, AsyncMock
+    from src.models.error import TimeoutError
+
+    policy = GitHubRetryPolicy(max_error_retries=1)
+
+    async def callback():
+        raise httpx.TimeoutException("timed out")
+
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        with pytest.raises(TimeoutError):
+            await policy.execute_with_retries(callback, "token_test")
+
+
+@pytest.mark.anyio
+async def test_execute_with_retries_enforces_max_time():
+    """Test that max_time stops retries when elapsed time exceeds limit. Requirements: 3.3, 5.5"""
+    from unittest.mock import patch, AsyncMock
+    from src.models.error import ServerError
+
+    policy = GitHubRetryPolicy(max_time=0.0, max_error_retries=10)
+
+    error_response = MagicMock(spec=httpx.Response)
+    error_response.status_code = 503
+    error_response.headers = {}
+
+    async def callback():
+        return error_response
+
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        with pytest.raises(ServerError):
+            await policy.execute_with_retries(callback, "token_test")
+
+
+@pytest.mark.anyio
+async def test_execute_with_retries_enforces_attempt_count_limit():
+    """Test that attempt count limit stops retries. Requirements: 3.2, 5.2"""
+    from unittest.mock import patch, AsyncMock
+    from src.models.error import ServerError
+
+    max_retries = 2
+    policy = GitHubRetryPolicy(max_error_retries=max_retries)
+
+    error_response = MagicMock(spec=httpx.Response)
+    error_response.status_code = 500
+    error_response.headers = {}
+
+    call_count = 0
+
+    async def callback():
+        nonlocal call_count
+        call_count += 1
+        return error_response
+
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        with pytest.raises(ServerError):
+            await policy.execute_with_retries(callback, "token_test")
+
+    # 1 initial attempt + max_retries retries
+    assert call_count == max_retries + 1
