@@ -78,7 +78,6 @@ The API will be available at `http://127.0.0.1:8000`.
 
 ```json
 {
-  "access_token": "<ACCESS_TOKEN>",
   "token_type": "bearer",
   "username": "<USERNAME>",
   "created_at": "<CREATED_AT>"
