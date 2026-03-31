@@ -1,7 +1,7 @@
 from typing import Any, List
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from src.dependencies.github import github_provider
 from src.github.service import GitHubService

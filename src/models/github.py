@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class UserShort(BaseModel):
     """Simplified GitHub user representation."""
+
     login: str
     id: int
     avatar_url: str
@@ -14,6 +15,7 @@ class UserShort(BaseModel):
 
 class GitHubBaseModel(BaseModel):
     """Base model for GitHub objects with common fields."""
+
     id: int
     url: Optional[str] = None
     html_url: Optional[str] = None

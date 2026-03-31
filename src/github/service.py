@@ -56,7 +56,11 @@ class GitHubService:
         return cast(
             Dict[str, Any],
             await self._request(
-                "GET", f"/repos/{owner}/{repo}", "get_repository", owner=owner, repo=repo
+                "GET",
+                f"/repos/{owner}/{repo}",
+                "get_repository",
+                owner=owner,
+                repo=repo,
             ),
         )
 

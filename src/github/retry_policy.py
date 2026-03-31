@@ -1,14 +1,18 @@
+import asyncio
 import random
 import time
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, Dict, Optional, cast
+from typing import Any, Awaitable, Callable, Dict, Optional, cast
 
 import httpx
 import structlog
 
 from src.models.error import (
+    NetworkError,
     RateLimitError,
+    ServerError,
+    TimeoutError,
 )
 
 logger = structlog.get_logger(__name__)
@@ -39,6 +43,7 @@ class GitHubRetryPolicy:
         self.max_time = max_time
         self.max_rate_limit_retries = max_rate_limit_retries
         self.max_error_retries = max_error_retries
+        self._rate_limit_state: Dict[Optional[str], Dict[str, Any]] = {}
 
     def evaluate_response(
         self, response: httpx.Response, attempt_counts: Dict[RetryType, int]
@@ -127,3 +132,138 @@ class GitHubRetryPolicy:
             return True
 
         return False
+
+    def update_rate_limit_state(
+        self,
+        response: httpx.Response,
+        access_token: Optional[str],
+    ) -> None:
+        """Update stored rate limit state from response headers.
+
+        Args:
+            response: HTTP response with rate limit headers
+            access_token: Token to update state for
+        """
+        remaining = response.headers.get("x-ratelimit-remaining")
+        reset = response.headers.get("x-ratelimit-reset")
+
+        if remaining is not None or reset is not None:
+            state = self._rate_limit_state.get(access_token, {})
+            if remaining is not None:
+                state["remaining"] = int(remaining)
+            if reset is not None:
+                state["reset"] = float(reset)
+            self._rate_limit_state[access_token] = state
+
+    def check_pacing(self, access_token: Optional[str]) -> float:
+        """Proactively calculate wait time based on rate limit state.
+
+        Args:
+            access_token: Token to check rate limit state for
+
+        Returns:
+            Wait time in seconds (0 if no wait needed)
+
+        Raises:
+            RateLimitError: When wait time exceeds 600 seconds
+        """
+        state = self._rate_limit_state.get(access_token)
+
+        if not state:
+            return 0.0
+
+        remaining = state.get("remaining")
+        reset = state.get("reset")
+
+        if remaining is None or reset is None:
+            return 0.0
+
+        if remaining > 100:
+            return 0.0
+
+        now = time.time()
+        time_until_reset = max(0.0, reset - now)
+
+        wait_time: float
+        if remaining == 0:
+            wait_time = time_until_reset + random.uniform(0, 1)
+        else:
+            # Low quota (0 < remaining <= 100)
+            wait_time = time_until_reset / remaining
+
+        if wait_time > 600:
+            logger.warning("rate_limit_pacing_wait_too_long", wait=wait_time)
+            raise RateLimitError()
+
+        if wait_time > 0:
+            logger.debug("rate_limit_pacing_delay", wait=wait_time, remaining=remaining)
+
+        return wait_time
+
+    def _handle_retry_failure(self, decision: RetryDecision) -> None:
+        """Raises the appropriate exception when retry limits are hit."""
+        if decision.retry_type == RetryType.RATE_LIMIT:
+            raise RateLimitError()
+        if decision.retry_type == RetryType.SERVER:
+            raise ServerError()
+        if decision.retry_type == RetryType.TIMEOUT:
+            raise TimeoutError()
+        raise NetworkError()
+
+    async def execute_with_retries(
+        self,
+        request_callback: Callable[[], Awaitable[httpx.Response]],
+        access_token: Optional[str] = None,
+    ) -> httpx.Response:
+        """Orchestrate retries for a request callback.
+
+        Args:
+            request_callback: Async function that performs the HTTP request
+            access_token: Token for rate limit state tracking
+
+        Returns:
+            The successful response
+
+        Raises:
+            RateLimitError: When rate limits are exceeded
+            ServerError: When server errors exceed retry limit
+            NetworkError: When network errors exceed retry limit
+            TimeoutError: When timeout errors exceed retry limit
+        """
+        start_time = time.time()
+        attempt_counts = {
+            RetryType.RATE_LIMIT: 0,
+            RetryType.SERVER: 0,
+            RetryType.NETWORK: 0,
+            RetryType.TIMEOUT: 0,
+        }
+
+        while True:
+            wait_time = self.check_pacing(access_token)
+            if wait_time > 0:
+                await asyncio.sleep(wait_time)
+
+            try:
+                response = await request_callback()
+                self.update_rate_limit_state(response, access_token)
+                decision = self.evaluate_response(response, attempt_counts)
+
+            except (httpx.TimeoutException, httpx.RequestError) as e:
+                decision = self.evaluate_exception(e, attempt_counts)
+
+            if decision is None:
+                return response
+
+            attempt_counts[decision.retry_type] += 1
+
+            if self.should_stop(decision, attempt_counts, start_time):
+                self._handle_retry_failure(decision)
+
+            logger.warning(
+                "github_request_retry",
+                wait=decision.wait,
+                retry_type=decision.retry_type.name,
+                attempt=attempt_counts[decision.retry_type],
+            )
+
+            await asyncio.sleep(decision.wait)
