@@ -104,6 +104,6 @@ def test_list_commits_rate_limit(client, auth_cookie, mock_github):
     mock.get_commits.side_effect = RateLimitError(retry_after=60)
 
     response = client.get("/github/repos/owner/repo/commits")
-    assert response.status_code == 403
+    assert response.status_code == 429
     assert response.json()["detail"] == "Rate limit exceeded"
     assert float(response.headers["Retry-After"]) == pytest.approx(60.0)
