@@ -28,7 +28,7 @@ A FastAPI-based application designed to interface with the GitHub API. It featur
 1. Clone the repository:
 
    ```bash
-   git clone <repository-url>
+   git clone git@github.com:Haroon-64/github_connector.git
    cd github_connector
    ```
 
