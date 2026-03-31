@@ -1,7 +1,7 @@
 from typing import Any, List
 
 import structlog
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends
 
 from src.dependencies.github import github_provider
 from src.github.service import GitHubService
@@ -15,7 +15,7 @@ logger = structlog.get_logger(__name__)
 async def create_issue(
     owner: str,
     repo: str,
-    issue: IssueRequest,
+    issue: IssueRequest = Body(..., description="The details of the issue to create"),
     service: GitHubService = Depends(github_provider(required=True)),
 ) -> Any:
     logger.debug("create_issue_request", owner=owner, repo=repo)

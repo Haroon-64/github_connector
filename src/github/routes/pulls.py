@@ -1,7 +1,7 @@
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends
 
 from src.dependencies.github import github_provider
 from src.github.service import GitHubService
@@ -15,7 +15,7 @@ logger = structlog.get_logger(__name__)
 async def create_pull(
     owner: str,
     repo: str,
-    pull: PRRequest,
+    pull: PRRequest = Body(..., description="The pull request information to create"),
     service: GitHubService = Depends(github_provider(required=True)),
 ) -> Any:
     logger.debug("create_pull_request", owner=owner, repo=repo)
