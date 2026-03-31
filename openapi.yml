@@ -17,13 +17,11 @@ paths:
             anyOf:
               - type: string
               - type: 'null'
-            description:
-              "A space-delimited list of scopes. Allowed scopes: user:email,
+            description: "A space-delimited list of scopes. Allowed scopes: user:email,
               repo, read:user"
             default: user:email repo read:user
             title: Scope
-          description:
-            "A space-delimited list of scopes. Allowed scopes: user:email,
+          description: "A space-delimited list of scopes. Allowed scopes: user:email,
             repo, read:user"
       responses:
         "200":
@@ -159,6 +157,7 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/IssueRequest"
+              description: The details of the issue to create
       responses:
         "200":
           description: Successful Response
@@ -230,14 +229,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PullRequestRequest"
+              $ref: "#/components/schemas/PRRequest"
+              description: The pull request information to create
       responses:
         "200":
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PullRequestResponse"
+                $ref: "#/components/schemas/PRResponse"
         "422":
           description: Validation Error
           content:
@@ -300,10 +300,8 @@ components:
           title: Commit
         author:
           anyOf:
-            - additionalProperties: true
-              type: object
+            - $ref: "#/components/schemas/UserShort"
             - type: 'null'
-          title: Author
         html_url:
           type: string
           title: Html Url
@@ -332,25 +330,26 @@ components:
         title:
           type: string
           title: Title
+          description: The title of the issue
         body:
-          anyOf:
-            - type: string
-            - type: 'null'
+          type: string
           title: Body
+          description: The description or body contents of the issue
+          default: ""
         assignees:
-          anyOf:
-            - items:
-                type: string
-              type: array
-            - type: 'null'
+          items:
+            type: string
+          type: array
           title: Assignees
+          description: List of GitHub usernames to assign to the issue
+          default: []
         labels:
-          anyOf:
-            - items:
-                type: string
-              type: array
-            - type: 'null'
+          items:
+            type: string
+          type: array
           title: Labels
+          description: List of label names to add to the issue
+          default: []
       type: object
       required:
         - title
@@ -360,6 +359,26 @@ components:
         id:
           type: integer
           title: Id
+        url:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Url
+        html_url:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Html Url
+        created_at:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Created At
+        updated_at:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Updated At
         number:
           type: integer
           title: Number
@@ -370,9 +389,7 @@ components:
           type: string
           title: State
         user:
-          additionalProperties: true
-          type: object
-          title: User
+          $ref: "#/components/schemas/UserShort"
         body:
           anyOf:
             - type: string
@@ -384,16 +401,6 @@ components:
               type: object
             - type: 'null'
           title: Pull Request
-        created_at:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Created At
-        updated_at:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Updated At
       type: object
       required:
         - id
@@ -412,33 +419,55 @@ components:
         - login_url
       title: LoginResponse
       description: Response model for login endpoint.
-    PullRequestRequest:
+    PRRequest:
       properties:
         title:
           type: string
           title: Title
+          description: The title of the pull request
+          default: ""
         head:
           type: string
           title: Head
+          description: The name of the branch where your changes are implemented
+          default: newbranch
         base:
           type: string
           title: Base
+          description: The name of the branch you want your changes pulled into
+          default: master
         body:
-          anyOf:
-            - type: string
-            - type: 'null'
+          type: string
           title: Body
+          description: The contents or description of the pull request
+          default: ""
       type: object
-      required:
-        - title
-        - head
-        - base
-      title: PullRequestRequest
-    PullRequestResponse:
+      title: PRRequest
+    PRResponse:
       properties:
         id:
           type: integer
           title: Id
+        url:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Url
+        html_url:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Html Url
+        created_at:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Created At
+        updated_at:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Updated At
         number:
           type: integer
           title: Number
@@ -454,9 +483,7 @@ components:
             - type: 'null'
           title: Body
         user:
-          additionalProperties: true
-          type: object
-          title: User
+          $ref: "#/components/schemas/UserShort"
         head:
           additionalProperties: true
           type: object
@@ -465,8 +492,30 @@ components:
           additionalProperties: true
           type: object
           title: Base
+      type: object
+      required:
+        - id
+        - number
+        - title
+        - state
+        - user
+        - head
+        - base
+      title: PRResponse
+    RepositoryResponse:
+      properties:
+        id:
+          type: integer
+          title: Id
+        url:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Url
         html_url:
-          type: string
+          anyOf:
+            - type: string
+            - type: 'null'
           title: Html Url
         created_at:
           anyOf:
@@ -478,22 +527,6 @@ components:
             - type: string
             - type: 'null'
           title: Updated At
-      type: object
-      required:
-        - id
-        - number
-        - title
-        - state
-        - user
-        - head
-        - base
-        - html_url
-      title: PullRequestResponse
-    RepositoryResponse:
-      properties:
-        id:
-          type: integer
-          title: Id
         name:
           type: string
           title: Name
@@ -504,12 +537,7 @@ components:
           type: boolean
           title: Private
         owner:
-          additionalProperties: true
-          type: object
-          title: Owner
-        html_url:
-          type: string
-          title: Html Url
+          $ref: "#/components/schemas/UserShort"
         description:
           anyOf:
             - type: string
@@ -518,21 +546,6 @@ components:
         fork:
           type: boolean
           title: Fork
-        url:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Url
-        created_at:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Created At
-        updated_at:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Updated At
         pushed_at:
           anyOf:
             - type: string
@@ -545,7 +558,6 @@ components:
         - full_name
         - private
         - owner
-        - html_url
         - fork
       title: RepositoryResponse
     UserResponse:
@@ -562,6 +574,32 @@ components:
         - created_at
       title: UserResponse
       description: Response model for /me endpoint.
+    UserShort:
+      properties:
+        login:
+          type: string
+          title: Login
+        id:
+          type: integer
+          title: Id
+        avatar_url:
+          type: string
+          title: Avatar Url
+        html_url:
+          type: string
+          title: Html Url
+        type:
+          type: string
+          title: Type
+      type: object
+      required:
+        - login
+        - id
+        - avatar_url
+        - html_url
+        - type
+      title: UserShort
+      description: Simplified GitHub user representation.
     ValidationError:
       properties:
         loc:
