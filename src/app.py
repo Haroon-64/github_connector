@@ -1,6 +1,6 @@
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from src.auth.routes import auth_router
@@ -24,6 +24,9 @@ app.add_middleware(SessionMiddleware, secret_key=settings.OAUTH_SECRET)
 app.include_router(auth_router, prefix="/auth")
 app.include_router(github_router, prefix="/github")
 
+@app.get("/", include_in_schema=False)
+def root():
+    return RedirectResponse(url="/docs")
 
 @app.exception_handler(ApiError)
 async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
