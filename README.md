@@ -21,7 +21,6 @@ A FastAPI-based application designed to interface with the GitHub API. It featur
 
 - Python 3.12+
 - [uv](https://github.com/astral-sh/uv) (recommended)
-- GitHub OAuth App credentials (Client ID and Client Secret)
 
 ## Installation
 
