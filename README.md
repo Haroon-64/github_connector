@@ -38,7 +38,7 @@ A FastAPI-based application designed to interface with the GitHub API. It featur
    cp .env.example .env
    ```
 
-3. Configure OAuth
+3. Configure OAuth app for login endpoint
     1. Go to [https://github.com/settings/applications/new](https://github.com/settings/applications/new)
     2. Fill in the following fields:
           - **Application name**: Connector
@@ -56,7 +56,9 @@ A FastAPI-based application designed to interface with the GitHub API. It featur
 Using `uv`:
 
 ```bash
+# install dependencies
 uv sync
+# run app
 uv run dev
 ```
 
@@ -64,7 +66,9 @@ The API will be available at `http://127.0.0.1:8000`.
 
 ## Login
 
-1. Go to [http://127.0.0.1:8000/auth/github/login](http://127.0.0.1:8000/auth/github/login)
+NOTE: due to `samesite="lax"` in cookie setting, login via swagger sometimes might not work. in that case:
+
+1. Open [http://127.0.0.1:8000/auth/github/login](http://127.0.0.1:8000/auth/github/login) in your browser
 2. Click on **Login url**
 3. Authorize the application
 4. You will be redirected to the callback URL
