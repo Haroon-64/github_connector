@@ -45,8 +45,9 @@ A FastAPI-based application designed to interface with the GitHub API. It featur
           - **Homepage URL**: <http://127.0.0.1:8000>
           - **Authorization callback URL**: <http://127.0.0.1:8000/auth/github/callback>
     3. Click on **Register application**
-    4. Copy the **Client ID** and **Client Secret**
-    5. Paste them in the `.env` file
+    4. Generate Client Secret
+    5. Copy the **Client ID** and **Client Secret**
+    6. Paste them in the `.env` file
     - `OAUTH_CLIENT_ID`: Your GitHub OAuth App Client ID.
     - `OAUTH_SECRET`: A secure key for session encryption. Generated from github oauth app.
 
