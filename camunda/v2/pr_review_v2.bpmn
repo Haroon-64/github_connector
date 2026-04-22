@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.46.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.9.0">
+  <bpmn:process id="pr_review_v2" name="PR Review Process V2" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_1" name="Start PR Review">
+      <bpmn:outgoing>Flow_Start_To_Validate</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Task_ValidatePR" name="Validate PR Details">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="validate-pr" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Start_To_Validate</bpmn:incoming>
+      <bpmn:incoming>Flow_Fix_To_Validate</bpmn:incoming>
+      <bpmn:outgoing>Flow_Validate_To_Review</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="Error_Validate" name="Validation Failed" attachedToRef="Task_ValidatePR">
+      <bpmn:outgoing>Flow_Error_To_Fix</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorEventDefinition_1" errorRef="Error_PR_NotFound" />
+    </bpmn:boundaryEvent>
+    <bpmn:userTask id="Task_FixPR" name="Fix PR Details">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition assignee="=reviewer" />
+        <zeebe:formDefinition formId="v2_inputs" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Error_To_Fix</bpmn:incoming>
+      <bpmn:outgoing>Flow_Fix_To_Validate</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Task_ReviewPR" name="Review Pull Request">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition assignee="=reviewer" />
+        <zeebe:formDefinition formId="v2_decision" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Validate_To_Review</bpmn:incoming>
+      <bpmn:incoming>Flow_Wait_To_Review</bpmn:incoming>
+      <bpmn:outgoing>Flow_Review_To_Gateway</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gateway_Decision" name="Review Decision">
+      <bpmn:incoming>Flow_Review_To_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Gateway_To_Approve</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Gateway_To_Wait</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Gateway_To_Comment</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateCatchEvent id="Event_WaitUpdate" name="Wait for Code Update">
+      <bpmn:incoming>Flow_Gateway_To_Wait</bpmn:incoming>
+      <bpmn:outgoing>Flow_Wait_To_Review</bpmn:outgoing>
+      <bpmn:messageEventDefinition messageRef="Message_PR_Updated" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:endEvent id="EndEvent_Approved" name="PR Approved">
+      <bpmn:incoming>Flow_Gateway_To_Approve</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="EndEvent_Commented" name="PR Commented">
+      <bpmn:incoming>Flow_Gateway_To_Comment</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_Start_To_Validate" sourceRef="StartEvent_1" targetRef="Task_ValidatePR" />
+    <bpmn:sequenceFlow id="Flow_Error_To_Fix" sourceRef="Error_Validate" targetRef="Task_FixPR" />
+    <bpmn:sequenceFlow id="Flow_Fix_To_Validate" sourceRef="Task_FixPR" targetRef="Task_ValidatePR" />
+    <bpmn:sequenceFlow id="Flow_Validate_To_Review" sourceRef="Task_ValidatePR" targetRef="Task_ReviewPR" />
+    <bpmn:sequenceFlow id="Flow_Review_To_Gateway" sourceRef="Task_ReviewPR" targetRef="Gateway_Decision" />
+    <bpmn:sequenceFlow id="Flow_Gateway_To_Approve" sourceRef="Gateway_Decision" targetRef="EndEvent_Approved">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=decision = "APPROVE"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Gateway_To_Wait" sourceRef="Gateway_Decision" targetRef="Event_WaitUpdate">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=decision = "REQUEST_CHANGES"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Gateway_To_Comment" sourceRef="Gateway_Decision" targetRef="EndEvent_Commented">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=decision = "COMMENT"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Wait_To_Review" sourceRef="Event_WaitUpdate" targetRef="Task_ReviewPR" />
+  </bpmn:process>
+  <bpmn:error id="Error_PR_NotFound" name="PR Not Found Error" errorCode="PR_NOT_FOUND" />
+  <bpmn:message id="Message_PR_Updated" name="pr_updated_message">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=pull_number" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="pr_review_v2">
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="150" y="100" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="130" y="143" width="77" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ValidatePR_di" bpmnElement="Task_ValidatePR">
+        <dc:Bounds x="250" y="78" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_FixPR_di" bpmnElement="Task_FixPR">
+        <dc:Bounds x="350" y="210" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReviewPR_di" bpmnElement="Task_ReviewPR">
+        <dc:Bounds x="420" y="78" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Decision_di" bpmnElement="Gateway_Decision" isMarkerVisible="true">
+        <dc:Bounds x="580" y="93" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="566" y="69" width="79" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_WaitUpdate_di" bpmnElement="Event_WaitUpdate">
+        <dc:Bounds x="587" y="212" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="566" y="255" width="80" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_Approved_di" bpmnElement="EndEvent_Approved">
+        <dc:Bounds x="700" y="40" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="686" y="83" width="65" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_Commented_di" bpmnElement="EndEvent_Commented">
+        <dc:Bounds x="700" y="152" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="679" y="195" width="78" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Error_Validate_di" bpmnElement="Error_Validate">
+        <dc:Bounds x="312" y="140" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_Start_To_Validate_di" bpmnElement="Flow_Start_To_Validate">
+        <di:waypoint x="186" y="118" />
+        <di:waypoint x="250" y="118" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Error_To_Fix_di" bpmnElement="Flow_Error_To_Fix">
+        <di:waypoint x="330" y="176" />
+        <di:waypoint x="330" y="250" />
+        <di:waypoint x="350" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Fix_To_Validate_di" bpmnElement="Flow_Fix_To_Validate">
+        <di:waypoint x="400" y="290" />
+        <di:waypoint x="400" y="320" />
+        <di:waypoint x="280" y="320" />
+        <di:waypoint x="280" y="158" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Validate_To_Review_di" bpmnElement="Flow_Validate_To_Review">
+        <di:waypoint x="350" y="118" />
+        <di:waypoint x="420" y="118" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Review_To_Gateway_di" bpmnElement="Flow_Review_To_Gateway">
+        <di:waypoint x="520" y="118" />
+        <di:waypoint x="580" y="118" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Gateway_To_Approve_di" bpmnElement="Flow_Gateway_To_Approve">
+        <di:waypoint x="605" y="93" />
+        <di:waypoint x="605" y="58" />
+        <di:waypoint x="700" y="58" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Gateway_To_Wait_di" bpmnElement="Flow_Gateway_To_Wait">
+        <di:waypoint x="630" y="120" />
+        <di:waypoint x="660" y="120" />
+        <di:waypoint x="660" y="230" />
+        <di:waypoint x="623" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Gateway_To_Comment_di" bpmnElement="Flow_Gateway_To_Comment">
+        <di:waypoint x="605" y="143" />
+        <di:waypoint x="605" y="170" />
+        <di:waypoint x="700" y="170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Wait_To_Review_di" bpmnElement="Flow_Wait_To_Review">
+        <di:waypoint x="587" y="230" />
+        <di:waypoint x="470" y="230" />
+        <di:waypoint x="470" y="160" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

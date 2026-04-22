@@ -1,0 +1,53 @@
+{
+  "components": [
+    {
+      "label": "Repository Owner",
+      "type": "textfield",
+      "layout": {
+        "row": "Row_0br8s0n",
+        "columns": null
+      },
+      "id": "Field_03cvxn5",
+      "key": "owner",
+      "validate": {
+        "required": true,
+        "minLength": 3
+      }
+    },
+    {
+      "label": "Repository Name",
+      "type": "textfield",
+      "layout": {
+        "row": "Row_1cjt8h4",
+        "columns": null
+      },
+      "id": "Field_0gf2682",
+      "key": "repo",
+      "validate": {
+        "required": true
+      }
+    },
+    {
+      "label": "Pull Request Number",
+      "type": "number",
+      "layout": {
+        "row": "Row_2px9k3l",
+        "columns": null
+      },
+      "id": "Field_1vbp8x9",
+      "key": "pull_number",
+      "validate": {
+        "required": true
+      }
+    }
+  ],
+  "type": "default",
+  "id": "v2_inputs",
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.4.0",
+  "exporter": {
+    "name": "Camunda Modeler",
+    "version": "5.20.0"
+  },
+  "schemaVersion": 19
+}
