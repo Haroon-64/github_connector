@@ -1,9 +1,15 @@
+import asyncio
+from contextlib import asynccontextmanager
+
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from src.auth.routes import auth_router
+from src.camunda.routes import camunda_router
+from src.camunda.worker import start_zeebe_worker
 from src.core.config import settings
 from src.core.logging import setup_logging
 from src.github.routes import github_router
@@ -12,21 +18,33 @@ from src.models.error import ApiError, ErrorResponse
 logger = setup_logging()
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(start_zeebe_worker())
+    yield
+    task.cancel()
+
+
 app = FastAPI(
     title="GitHub Connector",
     version="1.0.0",
     description="FastAPI-based GitHub Connector",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 app.add_middleware(SessionMiddleware, secret_key=settings.OAUTH_SECRET)
 app.include_router(auth_router, prefix="/auth")
 app.include_router(github_router, prefix="/github")
+app.include_router(camunda_router, prefix="/camunda")
 
-@app.get("/", include_in_schema=False)
-def root():
-    return RedirectResponse(url="/docs")
+app.mount("/", StaticFiles(directory="UI/dist", html=True), name="static")
+
+@app.get("/health")
+def health():
+    return JSONResponse({"status": "ok"})
+
 
 @app.exception_handler(ApiError)
 async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:

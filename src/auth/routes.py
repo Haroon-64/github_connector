@@ -52,7 +52,7 @@ async def github_callback(
     try:
         result = await auth_service.handle_callback(request)
 
-        redirect_response = RedirectResponse(url="http://127.0.0.1:5173/dashboard")
+        redirect_response = RedirectResponse(url="/")
 
         # Store user in an HTTP-only cookie using the service layer
         auth_service.login_user(redirect_response, result)
