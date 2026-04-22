@@ -2,6 +2,7 @@ from typing import Any, Dict, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import RedirectResponse
 
 from src.auth.service import GitHubAuthError, GitHubAuthService
 from src.core.config import settings
@@ -10,13 +11,13 @@ from src.dependencies.auth import (
     auth_provider,
     get_auth_service,
 )
-from src.models.auth import CallbackResponse, LoginResponse, UserResponse
+from src.models.auth import UserResponse
 
 auth_router = APIRouter()
 logger = structlog.get_logger(__name__)
 
 
-@auth_router.get("/github/login", response_model=LoginResponse)
+@auth_router.get("/github/login", include_in_schema=False)
 async def github_login(
     request: Request,
     scope: Optional[str] = Query(
@@ -27,7 +28,7 @@ async def github_login(
         ),
     ),
     auth_service: GitHubAuthService = Depends(get_auth_service),
-) -> LoginResponse:
+) -> RedirectResponse:
     """Initiate GitHub OAuth login flow."""
     logger.debug("github_login_start", scope=scope)
     try:
@@ -36,32 +37,27 @@ async def github_login(
             redirect_uri=settings.GITHUB_REDIRECT_URI,
             scope=scope,
         )
-        return LoginResponse(login_url=login_url)
+        return RedirectResponse(url=login_url)
     except GitHubAuthError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
-@auth_router.get(
-    "/github/callback", response_model=CallbackResponse, include_in_schema=False
-)
+@auth_router.get("/github/callback", include_in_schema=False)
 async def github_callback(
     request: Request,
-    response: Response,
     auth_service: GitHubAuthService = Depends(get_auth_service),
-) -> CallbackResponse:
+) -> Any:
     """Handle GitHub OAuth callback and retrieve access token."""
     logger.debug("github_callback_received")
     try:
         result = await auth_service.handle_callback(request)
 
-        # Store user in an HTTP-only cookie using the service layer
-        auth_service.login_user(response, result)
+        redirect_response = RedirectResponse(url="http://127.0.0.1:5173/dashboard")
 
-        return CallbackResponse(
-            token_type=result["token_type"],
-            username=result["username"],
-            created_at=result["created_at"],
-        )
+        # Store user in an HTTP-only cookie using the service layer
+        auth_service.login_user(redirect_response, result)
+
+        return redirect_response
     except GitHubAuthError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
