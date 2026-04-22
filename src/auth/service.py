@@ -76,7 +76,7 @@ class GitHubAuthService:
         logger.debug("revoking_token")
         try:
             url = (
-                f"https://api.github.com/applications/{settings.OAUTH_CLIENT_ID}/token"
+                f"https://api.github.com/applications/{settings.OAUTH_CLIENT_ID}/grant"
             )
             async with httpx.AsyncClient() as client:
                 response = await client.request(
