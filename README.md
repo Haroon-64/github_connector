@@ -9,8 +9,8 @@ A full-stack application that combines a **FastAPI** backend with a **React** fr
   - Automated PR validation via background workers.
   - Interactive User Task dashboard for manual code reviews.
   - Supports both **Local Camunda** (Self-Managed) and **Camunda SaaS** (Cloud).
-- **Modern UI**: A premium React dashboard built with a sleek glassmorphism aesthetic.
-- **Production Ready**: Unified Docker build for single-service deployment on platforms like Render.
+- **UI**: Simple UI for POC.
+- **Deployment**: Unified Docker build for single-service deployment on platforms like Render.
 
 ## Prerequisites
 
@@ -27,7 +27,7 @@ A full-stack application that combines a **FastAPI** backend with a **React** fr
 cp .env.example .env
 ```
 
-Fill in your GitHub OAuth credentials and Camunda Cluster details in `.env`.
+Fill in your GitHub OAuth app credentials and Camunda Cluster details in `.env`.
 
 ### 2. Configure Camunda Mode
 
@@ -51,7 +51,7 @@ The application will be available at `http://localhost:8000`.
 This project is configured for **Web Service** deployment on Render using the provided `Dockerfile`.
 
 1. Push your code to GitHub.
-2. Create a new **Service** on Render.
+2. Create a new **Web Service** on Render.
 3. Add your environment variables (ensure `USE_SAAS=True` and `IP_ADDRESS=0.0.0.0`).
 4. Update your GitHub OAuth callback URL to `https://your-app.onrender.com/auth/github/callback`.
 
