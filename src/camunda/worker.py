@@ -10,7 +10,7 @@ logger = structlog.get_logger(__name__)
 
 
 def _get_base_url():
-    if settings.ZEEBE_REST_ADDRESS:
+    if settings.USE_SAAS and settings.ZEEBE_REST_ADDRESS:
         return (
             f"{settings.ZEEBE_REST_ADDRESS}/v2"
             if not settings.ZEEBE_REST_ADDRESS.endswith("/v2")
@@ -39,6 +39,7 @@ async def start_zeebe_worker() -> None:
                     "timeout": 30000,
                     "worker": "fastapi-worker",
                 }
+                # Use a slightly longer timeout than the long-polling timeout
                 response = await client.post(
                     url_activate, json=payload, headers=headers, timeout=35.0
                 )
@@ -75,7 +76,7 @@ async def process_validate_pr_job(
         if not owner or not repo or not pull_number:
             raise ValueError("Missing required repository parameters")
 
-        if int(pull_number) == 999:
+        if int(pull_number) == 999:  # Magic number to test PR not found loop
             raise ValueError("PR #999 explicitly marked as not found for testing")
 
         url_complete = f"{base_url}/jobs/{job_key}/completion"

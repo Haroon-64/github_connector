@@ -15,9 +15,9 @@ _token_expiry: float = 0
 async def get_camunda_token() -> Optional[str]:
     """
     Fetches an OAuth JWT from Camunda SaaS using client credentials.
-    Returns None if ZEEBE_CLIENT_ID is not configured (e.g., local dev).
+    Returns None if USE_SAAS is False.
     """
-    if not settings.ZEEBE_CLIENT_ID:
+    if not settings.USE_SAAS:
         return None
 
     global _token_cache, _token_expiry

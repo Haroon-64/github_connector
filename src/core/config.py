@@ -7,6 +7,7 @@ load_dotenv()
 
 
 class Settings(BaseSettings):
+    USE_SAAS: bool = False
     IP_ADDRESS: str = "127.0.0.1"
     PORT: int = 8000
     LOG_LEVEL: str = "info"

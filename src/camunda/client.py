@@ -4,15 +4,15 @@ from typing import Any, Dict
 import httpx
 import structlog
 
-from src.camunda.auth import get_camunda_token
 from src.core.config import settings
+from src.camunda.auth import get_camunda_token
 
 logger = structlog.get_logger(__name__)
 
 
 class CamundaClient:
     def __init__(self):
-        if settings.ZEEBE_REST_ADDRESS:
+        if settings.USE_SAAS and settings.ZEEBE_REST_ADDRESS:
             self.base_url = (
                 f"{settings.ZEEBE_REST_ADDRESS}/v2"
                 if not settings.ZEEBE_REST_ADDRESS.endswith("/v2")
