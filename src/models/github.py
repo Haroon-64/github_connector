@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -82,3 +82,43 @@ class CommitResponse(BaseModel):
     author: Optional[UserShort] = None
     html_url: str
     url: Optional[str] = None
+
+class PRReviewRequest(BaseModel):
+    event: Literal["APPROVE", "REQUEST_CHANGES", "COMMENT"]
+    body: Optional[str] = None
+
+
+class PRReviewResponse(BaseModel):
+    id: int
+    state: str
+    body: Optional[str]
+
+
+class CommentRequest(BaseModel):
+    body: str
+
+
+class CommentResponse(GitHubBaseModel):
+    body: str
+    user: UserShort
+
+
+class PRMergeRequest(BaseModel):
+    commit_title: Optional[str] = None
+    commit_message: Optional[str] = None
+    merge_method: Optional[Literal["merge", "squash", "rebase"]] = "merge"
+
+
+class PRMergeResponse(BaseModel):
+    sha: str
+    merged: bool
+    message: str
+
+
+class CamundaOption(BaseModel):
+    label: str
+    value: Any
+
+
+class CamundaOptionsResponse(BaseModel):
+    prOptions: List[CamundaOption]

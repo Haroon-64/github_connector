@@ -109,6 +109,18 @@ class GitHubService:
             ),
         )
 
+    async def get_pulls(self, owner: str, repo: str) -> List[Dict[str, Any]]:
+        return cast(
+            List[Dict[str, Any]],
+            await self._request(
+                "GET",
+                f"/repos/{owner}/{repo}/pulls",
+                "get_pulls",
+                owner=owner,
+                repo=repo,
+            ),
+        )
+
     async def get_commits(
         self, owner: str, repo: str, sha: Optional[str] = None
     ) -> List[Dict[str, Any]]:
@@ -126,3 +138,55 @@ class GitHubService:
                 params=params,
             ),
         )
+
+    async def create_pull_request_review(
+        self, owner: str, repo: str, pull_number: int, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Create a review on a pull request."""
+        return cast(
+            Dict[str, Any],
+            await self._request(
+                "POST",
+                f"/repos/{owner}/{repo}/pulls/{pull_number}/reviews",
+                "create_pull_request_review",
+                owner=owner,
+                repo=repo,
+                pull_number=pull_number,
+                json_data=data,
+            ),
+        )
+
+    async def merge_pull_request(
+        self, owner: str, repo: str, pull_number: int, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Merge a pull request."""
+        return cast(
+            Dict[str, Any],
+            await self._request(
+                "PUT",
+                f"/repos/{owner}/{repo}/pulls/{pull_number}/merge",
+                "merge_pull_request",
+                owner=owner,
+                repo=repo,
+                pull_number=pull_number,
+                json_data=data,
+            ),
+        )
+
+    async def create_issue_comment(
+        self, owner: str, repo: str, issue_number: int, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Create a comment on an issue or pull request."""
+        return cast(
+            Dict[str, Any],
+            await self._request(
+                "POST",
+                f"/repos/{owner}/{repo}/issues/{issue_number}/comments",
+                "create_issue_comment",
+                owner=owner,
+                repo=repo,
+                issue_number=issue_number,
+                json_data=data,
+            ),
+        )
+
