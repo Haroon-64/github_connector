@@ -8,7 +8,8 @@ export default defineConfig({
     host: '127.0.0.1',
     proxy: {
       '/auth': 'http://127.0.0.1:8000',
-      '/github': 'http://127.0.0.1:8000'
+      '/github': 'http://127.0.0.1:8000',
+      '/camunda': 'http://127.0.0.1:8000'
     }
   }
 })
