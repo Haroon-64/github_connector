@@ -39,9 +39,7 @@ class IssueRequest(BaseModel):
     assignees: List[str] = Field(
         [], description="List of GitHub usernames to assign to the issue"
     )
-    labels: List[str] = Field(
-        [], description="List of label names to add to the issue"
-    )
+    labels: List[str] = Field([], description="List of label names to add to the issue")
 
 
 class IssueResponse(GitHubBaseModel):
@@ -82,6 +80,7 @@ class CommitResponse(BaseModel):
     author: Optional[UserShort] = None
     html_url: str
     url: Optional[str] = None
+
 
 class PRReviewRequest(BaseModel):
     event: Literal["APPROVE", "REQUEST_CHANGES", "COMMENT"]

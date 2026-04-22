@@ -189,4 +189,3 @@ class GitHubService:
                 json_data=data,
             ),
         )
-

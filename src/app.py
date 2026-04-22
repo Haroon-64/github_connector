@@ -1,11 +1,11 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.middleware.sessions import SessionMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.middleware.sessions import SessionMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from src.auth.routes import auth_router
 from src.camunda.routes import camunda_router
@@ -34,12 +34,20 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 app.add_middleware(SessionMiddleware, secret_key=settings.OAUTH_SECRET)
 app.include_router(auth_router, prefix="/auth")
 app.include_router(github_router, prefix="/github")
 app.include_router(camunda_router, prefix="/camunda")
 
 app.mount("/", StaticFiles(directory="UI/dist", html=True), name="static")
+
+
+@app.exception_handler(404)
+async def spa_catch_all(request: Request, exc: Exception):
+    """Catch-all for SPA routing: always serve index.html for unknown routes."""
+    return FileResponse("UI/dist/index.html")
+
 
 @app.get("/health")
 def health():
@@ -65,22 +73,10 @@ async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
     elif exc.type == "auth":
         content["detail"] = "Authentication failed"
     else:
-        content["detail"] = f"{exc.type.capitalize()} error occurred"
-
-    logger.error(
-        "api_error",
-        type=exc.type,
-        status=exc.status,
-        details=exc.details,
-        path=request.url.path,
-    )
+        content["detail"] = "Internal server error"
 
     return JSONResponse(
         status_code=exc.status,
         content=content,
         headers=headers,
     )
-
-
-if __name__ == "__main__":
-    uvicorn.run(app, host=settings.IP_ADDRESS, port=settings.PORT)

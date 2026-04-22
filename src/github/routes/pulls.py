@@ -108,6 +108,7 @@ async def merge_pull_request_endpoint(
         merge_req.model_dump(exclude_unset=True),
     )
 
+
 @router.post(
     "/repos/{owner}/{repo}/pulls/{pull_number}/comments", response_model=CommentResponse
 )
