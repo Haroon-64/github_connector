@@ -1,0 +1,60 @@
+{
+  "components": [
+    {
+      "label": "decision",
+      "values": [
+        {
+          "label": "approve",
+          "value": "approve"
+        },
+        {
+          "label": "review",
+          "value": "review"
+        },
+        {
+          "label": "comment",
+          "value": "comment"
+        }
+      ],
+      "type": "radio",
+      "layout": {
+        "row": "Row_1y0emyq",
+        "columns": null
+      },
+      "id": "Field_1xrjrxs",
+      "key": "decision",
+      "description": "approve or review",
+      "defaultValue": "review",
+      "validate": {
+        "required": true
+      }
+    },
+    {
+      "label": "Comment",
+      "type": "textarea",
+      "layout": {
+        "row": "Row_0srs4fc",
+        "columns": null
+      },
+      "id": "Field_0mi0ib5",
+      "key": "comment",
+      "conditional": {
+        "hide": "=decision = \"approve\""
+      },
+      "validate": {
+        "required": false
+      },
+      "properties": {},
+      "readonly": false
+    }
+  ],
+  "type": "default",
+  "id": "decision",
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.9.0",
+  "exporter": {
+    "name": "Camunda Modeler",
+    "version": "5.46.1"
+  },
+  "schemaVersion": 19
+}

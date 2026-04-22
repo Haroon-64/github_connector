@@ -1,0 +1,28 @@
+{
+  "components": [
+    {
+      "label": "Select PR",
+      "type": "select",
+      "layout": {
+        "row": "Row_1mth3wb",
+        "columns": null
+      },
+      "id": "Field_0nxm9de",
+      "key": "PR_ID",
+      "description": "PR number",
+      "valuesExpression": "=prOptions",
+      "validate": {
+        "required": true
+      }
+    }
+  ],
+  "type": "default",
+  "id": "pr",
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.9.0",
+  "exporter": {
+    "name": "Camunda Modeler",
+    "version": "5.46.1"
+  },
+  "schemaVersion": 19
+}

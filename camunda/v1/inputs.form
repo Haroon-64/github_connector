@@ -1,0 +1,56 @@
+{
+  "components": [
+    {
+      "label": "Token (ghp)",
+      "type": "textfield",
+      "layout": {
+        "row": "Row_04nyy96",
+        "columns": null
+      },
+      "id": "Field_0sedza0",
+      "key": "githubToken",
+      "validate": {
+        "required": true,
+        "pattern": "^ghp_[A-Za-z0-9]{36}$"
+      },
+      "description": "Github Token"
+    },
+    {
+      "label": "owner",
+      "type": "textfield",
+      "layout": {
+        "row": "Row_0br8s0n",
+        "columns": null
+      },
+      "id": "Field_03cvxn5",
+      "key": "owner",
+      "validate": {
+        "required": true,
+        "minLength": "3"
+      }
+    },
+    {
+      "label": "repo",
+      "type": "textfield",
+      "layout": {
+        "row": "Row_1cjt8h4",
+        "columns": null
+      },
+      "id": "Field_0gf2682",
+      "key": "repo",
+      "description": "repository",
+      "validate": {
+        "required": true
+      }
+    }
+  ],
+  "type": "default",
+  "id": "inputs",
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.9.0",
+  "exporter": {
+    "name": "Camunda Modeler",
+    "version": "5.46.1"
+  },
+  "schemaVersion": 19
+}
